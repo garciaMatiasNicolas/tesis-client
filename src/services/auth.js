@@ -1,3 +1,4 @@
+import useApiMethods from '@/hooks/useApiMethods';
 import Cookies from 'js-cookie';
 import { jwtDecode } from 'jwt-decode';
 
@@ -66,6 +67,7 @@ const refreshAuthToken = async () => {
     }
 };
 
+
 const isAuthenticated = async (verifyExpiration = true) => {
     let token = getAuthTokenFromCookie();
     
@@ -77,10 +79,17 @@ const isAuthenticated = async (verifyExpiration = true) => {
         if (isTokenExpired(token)) {
             token = await refreshAuthToken();
         }
-    };
-
+    }
+    
     return token || false;
 };
 
 
-export { isAuthenticated, setAuthTokenIntoCookie, getAuthTokenFromCookie, removeAuthToken };
+export { 
+    isAuthenticated, 
+    setAuthTokenIntoCookie, 
+    getAuthTokenFromCookie, 
+    removeAuthToken, 
+    refreshAuthToken, 
+    isTokenExpired 
+};

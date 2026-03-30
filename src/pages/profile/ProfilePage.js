@@ -38,7 +38,6 @@ export default function ProfilePage() {
     const fetchUser = async () => {
         try {
             const response = await getMethod("/users/me/");
-            console.log("Respuesta de la API de usuario:", response);
             setUser(response);
         } catch (error) {
             setAlert({
@@ -97,15 +96,9 @@ export default function ProfilePage() {
                 };
 
                 try {
-                    console.log("Datos del empleado a enviar:", employeeData);
-                    console.log("ID del empleado:", userData.employee_info.id);
-                    
                     // Actualizar los datos del empleado - ahora solo campos editables
                     await putMethod(`/employees/${userData.employee_info.id}/`, employeeData);
                 } catch (employeeError) {
-                    console.error("Error actualizando datos del empleado:", employeeError);
-                    console.error("Response data:", employeeError.response?.data);
-                    console.error("Datos enviados:", employeeData);
                     hasErrors = true;
                     
                     // Mostrar errores específicos si están disponibles
@@ -136,7 +129,6 @@ export default function ProfilePage() {
                 });
             }
         } catch (error) {
-            console.error("Error actualizando usuario:", error);
             setAlert({
                 show: true,
                 type: 'danger',
@@ -172,7 +164,6 @@ export default function ProfilePage() {
                 });
             }
         } catch (error) {
-            console.error("Error guardando tienda:", error);
             setAlert({
                 show: true,
                 type: 'danger',
@@ -211,7 +202,6 @@ export default function ProfilePage() {
             
             setBranches(branchesWithManagerNames);
         } catch (error) {
-            console.error("Error cargando sucursales:", error);
             setAlert({
                 show: true,
                 type: 'danger',
@@ -235,7 +225,6 @@ export default function ProfilePage() {
             );
             setUsers(managers);
         } catch (error) {
-            console.error("Error cargando managers:", error);
             setAlert({
                 show: true,
                 type: 'danger',
@@ -347,7 +336,6 @@ export default function ProfilePage() {
                     message: 'La sucursal se ha eliminado correctamente.'
                 });
             } catch (error) {
-                console.error("Error eliminando sucursal:", error);
                 setAlert({
                     show: true,
                     type: 'danger',
@@ -404,7 +392,6 @@ export default function ProfilePage() {
                 });
             }
         } catch (error) {
-            console.error("Error guardando sucursal:", error);
             if (error.response && error.response.data.manager) {
                 setAlert({
                     show: true,

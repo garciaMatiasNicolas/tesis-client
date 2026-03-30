@@ -12,14 +12,16 @@ const EmployeeModal = ({
     users = [],
     onSubmit,
     loading = false,
-    currentUser = null
+    currentUser = null,
+    staticBackdrop = false
 }) => {
     if (!isOpen) return null;
 
     const isEdit = employee !== null;
 
     const handleBackdropClick = (e) => {
-        if (e.target === e.currentTarget) {
+        // Solo cierra si staticBackdrop es false
+        if (!staticBackdrop && e.target === e.currentTarget) {
             onClose();
         }
     };

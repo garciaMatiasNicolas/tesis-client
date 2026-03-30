@@ -3,10 +3,11 @@ import React, { useState, useRef, useEffect } from "react";
 import { 
     FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaCalendarAlt, 
     FaBriefcase, FaCamera, FaIdCard, FaSave, FaTimes, FaBuilding,
-    FaSpinner, FaCheck, FaExclamationTriangle
+    FaSpinner, FaCheck, FaExclamationTriangle, FaSearch
 } from "react-icons/fa";
 import useEmailValidation from "@/hooks/useEmailValidation";
 import { useFormErrors, extractDjangoErrors } from "@/utils/errorUtils";
+import georefService from "@/services/georefService";
 
 const EmployeeForm = ({ 
     employee = null, 
@@ -26,7 +27,6 @@ const EmployeeForm = ({
     // Hooks para validación
     const { emailStatus, validateEmail, resetValidation } = useEmailValidation();
     const { 
-        formErrors, 
         setFieldError, 
         clearFieldError, 
         setErrors: setFormErrors, 
@@ -34,6 +34,15 @@ const EmployeeForm = ({
         hasError,
         getError 
     } = useFormErrors();
+    
+    // Estados para Georef API
+    const [provincias, setProvincias] = useState([]);
+    const [ciudades, setCiudades] = useState([]);
+    const [loadingProvincias, setLoadingProvincias] = useState(false);
+    const [loadingCiudades, setLoadingCiudades] = useState(false);
+    const [selectedProvinciaId, setSelectedProvinciaId] = useState(null);
+    const [citySearchTerm, setCitySearchTerm] = useState('');
+    const [showCityDropdown, setShowCityDropdown] = useState(false);
     
     // Estado del formulario
     const [formData, setFormData] = useState({
@@ -78,6 +87,39 @@ const EmployeeForm = ({
         }
     }, [serverErrors, setFormErrors]);
 
+    // Cargar provincias al montar el componente
+    useEffect(() => {
+        loadProvincias();
+    }, []);
+
+    // Cerrar dropdown al hacer clic fuera
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (showCityDropdown && !event.target.closest('.city-search-container')) {
+                setShowCityDropdown(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showCityDropdown]);
+
+    // Cargar ciudades cuando hay un empleado con provincia de Argentina
+    useEffect(() => {
+        if (employee && employee.state && employee.country === 'Argentina') {
+            const provincia = provincias.find(p => p.nombre === employee.state);
+            if (provincia) {
+                setSelectedProvinciaId(provincia.id);
+                loadCiudades(provincia.id, provincia.nombre);
+            }
+        }
+        if (employee && employee.city) {
+            setCitySearchTerm(employee.city);
+        }
+    }, [employee, provincias]);
+
     // Efecto para asignar automáticamente la sucursal del manager
     useEffect(() => {
         if (currentUser?.role === 'manager' && currentUser?.employee_info?.branch && !isEdit) {
@@ -88,6 +130,86 @@ const EmployeeForm = ({
             }));
         }
     }, [currentUser, isEdit]);
+
+    // Cargar provincias desde la API de Georef
+    const loadProvincias = async () => {
+        try {
+            setLoadingProvincias(true);
+            const data = await georefService.getProvincias();
+            setProvincias(data);
+        } catch (error) {
+            console.error('Error loading provincias:', error);
+        } finally {
+            setLoadingProvincias(false);
+        }
+    };
+
+    // Cargar ciudades cuando se selecciona una provincia
+    const loadCiudades = async (provinciaId, provinciaNombre) => {
+        try {
+            setLoadingCiudades(true);
+            setCiudades([]);
+            const data = await georefService.getLocalidades(provinciaId, provinciaNombre);
+            setCiudades(data);
+        } catch (error) {
+            console.error('Error loading ciudades:', error);
+        } finally {
+            setLoadingCiudades(false);
+        }
+    };
+
+    // Manejar búsqueda de ciudades
+    const handleCitySearch = async (searchTerm) => {
+        setCitySearchTerm(searchTerm);
+        
+        if (searchTerm.length >= 2 && selectedProvinciaId) {
+            try {
+                setLoadingCiudades(true);
+                const data = await georefService.searchLocalidades(searchTerm, selectedProvinciaId);
+                setCiudades(data);
+                setShowCityDropdown(true);
+            } catch (error) {
+                console.error('Error searching ciudades:', error);
+            } finally {
+                setLoadingCiudades(false);
+            }
+        } else if (searchTerm.length === 0 && selectedProvinciaId) {
+            const provincia = provincias.find(p => p.id === selectedProvinciaId);
+            if (provincia) {
+                loadCiudades(selectedProvinciaId, provincia.nombre);
+            }
+        }
+    };
+
+    // Seleccionar ciudad del dropdown
+    const selectCity = (cityName) => {
+        setFormData(prev => ({ ...prev, city: cityName }));
+        setCitySearchTerm(cityName);
+        setShowCityDropdown(false);
+        clearFieldError('city');
+    };
+
+    // Manejar cambio de provincia
+    const handleProvinciaChange = (selectedId) => {
+        const provincia = provincias.find(p => p.id === selectedId);
+        
+        if (provincia) {
+            setSelectedProvinciaId(selectedId);
+            setFormData(prev => ({ ...prev, state: provincia.nombre, city: '' }));
+            setCitySearchTerm('');
+            loadCiudades(selectedId, provincia.nombre);
+            clearFieldError('state');
+        }
+    };
+
+    // Manejar cambio de país
+    const handleCountryChange = (value) => {
+        setFormData(prev => ({ ...prev, country: value, state: '', city: '' }));
+        setSelectedProvinciaId(null);
+        setCiudades([]);
+        setCitySearchTerm('');
+        clearFieldError('country');
+    };
 
     const handleChange = (field, value) => {
         setFormData(prev => ({
@@ -206,7 +328,10 @@ const EmployeeForm = ({
         }
 
         try {
-            await onSubmit(formData);
+            //console.log("Submitting Employee Form with data:", formData);
+            console.log(employee?.store);
+            console.log(currentUser?.employee_info?.store);
+            //await onSubmit(formData);
         } catch (error) {
             console.error("Error en EmployeeForm:", error);
             
@@ -679,39 +804,121 @@ const EmployeeForm = ({
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             País
                         </label>
-                        <input
-                            type="text"
+                        <select
                             className="w-full text-gray-900 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c]"
                             value={formData.country}
-                            onChange={(e) => handleChange('country', e.target.value)}
-                            placeholder="Argentina"
-                        />
+                            onChange={(e) => handleCountryChange(e.target.value)}
+                        >
+                            <option value="">Seleccione un país</option>
+                            <option value="Argentina">Argentina</option>
+                            <option value="Brasil">Brasil</option>
+                            <option value="Chile">Chile</option>
+                            <option value="Colombia">Colombia</option>
+                            <option value="México">México</option>
+                            <option value="Perú">Perú</option>
+                            <option value="Uruguay">Uruguay</option>
+                            <option value="Paraguay">Paraguay</option>
+                            <option value="Bolivia">Bolivia</option>
+                            <option value="Ecuador">Ecuador</option>
+                            <option value="Venezuela">Venezuela</option>
+                            <option value="España">España</option>
+                            <option value="Estados Unidos">Estados Unidos</option>
+                            <option value="Otro">Otro</option>
+                        </select>
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Estado/Provincia
+                            {formData.country === 'Argentina' && loadingProvincias && (
+                                <FaSpinner className="inline ml-2 animate-spin text-gray-400 text-xs" />
+                            )}
                         </label>
-                        <input
-                            type="text"
-                            className="w-full text-gray-900 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c]"
-                            value={formData.state}
-                            onChange={(e) => handleChange('state', e.target.value)}
-                            placeholder="Buenos Aires"
-                        />
+                        {formData.country === 'Argentina' ? (
+                            <select
+                                className="w-full text-gray-900 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c]"
+                                value={selectedProvinciaId || ''}
+                                onChange={(e) => handleProvinciaChange(e.target.value)}
+                                disabled={loadingProvincias}
+                            >
+                                <option value="">Seleccione una provincia</option>
+                                {provincias.map(provincia => (
+                                    <option key={provincia.id} value={provincia.id}>
+                                        {provincia.nombre}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <input
+                                type="text"
+                                className="w-full text-gray-900 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c]"
+                                value={formData.state}
+                                onChange={(e) => handleChange('state', e.target.value)}
+                                placeholder="Buenos Aires"
+                            />
+                        )}
                     </div>
 
-                    <div>
+                    <div className="relative city-search-container">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Ciudad
+                            Ciudad/Localidad
+                            {formData.country === 'Argentina' && loadingCiudades && (
+                                <FaSpinner className="inline ml-2 animate-spin text-gray-400 text-xs" />
+                            )}
                         </label>
-                        <input
-                            type="text"
-                            className="w-full text-gray-900 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c]"
-                            value={formData.city}
-                            onChange={(e) => handleChange('city', e.target.value)}
-                            placeholder="CABA"
-                        />
+                        {formData.country === 'Argentina' ? (
+                            <>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={citySearchTerm || formData.city}
+                                        onChange={(e) => {
+                                            handleCitySearch(e.target.value);
+                                            handleChange('city', e.target.value);
+                                        }}
+                                        onFocus={() => {
+                                            if (ciudades.length > 0) {
+                                                setShowCityDropdown(true);
+                                            }
+                                        }}
+                                        className="w-full text-gray-900 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c]"
+                                        placeholder={selectedProvinciaId ? "Buscar ciudad..." : "Primero seleccione provincia"}
+                                        disabled={!selectedProvinciaId}
+                                    />
+                                    <FaSearch className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm" />
+                                </div>
+                                
+                                {/* Dropdown de ciudades */}
+                                {showCityDropdown && ciudades.length > 0 && (
+                                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                        {ciudades.map((ciudad) => (
+                                            <button
+                                                key={ciudad.id}
+                                                type="button"
+                                                onClick={() => selectCity(ciudad.nombre)}
+                                                className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm text-gray-900 transition-colors"
+                                            >
+                                                {ciudad.nombre}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                
+                                {selectedProvinciaId && ciudades.length === 0 && !loadingCiudades && (
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Escriba al menos 2 letras para buscar
+                                    </p>
+                                )}
+                            </>
+                        ) : (
+                            <input
+                                type="text"
+                                className="w-full text-gray-900 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c]"
+                                value={formData.city}
+                                onChange={(e) => handleChange('city', e.target.value)}
+                                placeholder="CABA"
+                            />
+                        )}
                     </div>
 
                     <div>

@@ -49,13 +49,35 @@ const useProductService = () => {
             }
         },
 
-        // Eliminar un producto
+        // Eliminar un producto (eliminación lógica - descontinuar)
         deleteProduct: async (id) => {
             try {
                 const response = await deleteMethod(`/products/${id}/`);
                 return response;
             } catch (error) {
                 console.error('Error al eliminar producto:', error);
+                throw error;
+            }
+        },
+
+        // Eliminar permanentemente un producto (eliminación física)
+        permanentDeleteProduct: async (id) => {
+            try {
+                const response = await deleteMethod(`/products/${id}/permanent_delete/`);
+                return response;
+            } catch (error) {
+                console.error('Error al eliminar permanentemente producto:', error);
+                throw error;
+            }
+        },
+
+        // Reactivar un producto descontinuado
+        reactivateProduct: async (id) => {
+            try {
+                const response = await postMethod(`/products/${id}/reactivate/`);
+                return response;
+            } catch (error) {
+                console.error('Error al reactivar producto:', error);
                 throw error;
             }
         },
@@ -124,6 +146,77 @@ const useProductService = () => {
                 return response;
             } catch (error) {
                 console.error('Error al crear proveedor:', error);
+                throw error;
+            }
+        },
+
+        // PRODUCT UNITS - Unidades de conversión de productos
+        // Obtener todas las unidades de un producto
+        getProductUnits: async (productId) => {
+            try {
+                const response = await getMethod(`/productunits/?product=${productId}`);
+                const unitsArray = Array.isArray(response) ? response : 
+                                  (response && response.results) ? response.results :
+                                  (response && response.data) ? response.data : [];
+                console.log('Unidades del producto obtenidas:', unitsArray);
+                return unitsArray;
+            } catch (error) {
+                console.error('Error al obtener unidades del producto:', error);
+                throw error;
+            }
+        },
+
+        // Obtener todas las unidades de conversión
+        getAllProductUnits: async () => {
+            try {
+                const response = await getMethod('/productunits/');
+                return response;
+            } catch (error) {
+                console.error('Error al obtener unidades de productos:', error);
+                throw error;
+            }
+        },
+
+        // Obtener una unidad de producto por ID
+        getProductUnitById: async (id) => {
+            try {
+                const response = await getMethod(`/productunits/${id}/`);
+                return response;
+            } catch (error) {
+                console.error('Error al obtener unidad de producto:', error);
+                throw error;
+            }
+        },
+
+        // Crear una nueva unidad de producto
+        createProductUnit: async (unitData) => {
+            try {
+                const response = await postMethod('/productunits/', unitData);
+                return response;
+            } catch (error) {
+                console.error('Error al crear unidad de producto:', error);
+                throw error;
+            }
+        },
+
+        // Actualizar una unidad de producto
+        updateProductUnit: async (id, unitData) => {
+            try {
+                const response = await putMethod(`/productunits/${id}/`, unitData);
+                return response;
+            } catch (error) {
+                console.error('Error al actualizar unidad de producto:', error);
+                throw error;
+            }
+        },
+
+        // Eliminar una unidad de producto
+        deleteProductUnit: async (id) => {
+            try {
+                const response = await deleteMethod(`/productunits/${id}/`);
+                return response;
+            } catch (error) {
+                console.error('Error al eliminar unidad de producto:', error);
                 throw error;
             }
         }

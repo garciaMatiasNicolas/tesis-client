@@ -6,7 +6,7 @@ import useApiMethods from '@/hooks/useApiMethods';
 import React from 'react'
 
 const SuppliersPage = () => {
-    const { postMethod, deleteMethod, getMethod } = useApiMethods();
+    const { postMethod, deleteMethod, getMethod, patchMethod } = useApiMethods();
     const [suppliers, setSuppliers] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
@@ -116,6 +116,76 @@ const SuppliersPage = () => {
         }
     };
 
+    // Manejar actualización de proveedor
+    const handleUpdateSupplier = async (supplierId, supplierData) => {
+        try {
+            setLoading(true);
+            setError(null);
+            setAlert(null);
+            const response = await patchMethod(`/suppliers/${supplierId}/`, supplierData);
+            
+            if (response && response.supplier) {
+                // Actualizar el proveedor en la lista
+                setSuppliers(prev => prev.map(s => 
+                    s.id === supplierId ? response.supplier : s
+                ));
+                showAlert('success', 'Proveedor actualizado', 'El proveedor se ha actualizado exitosamente.');
+                return { success: true, data: response.supplier };
+            } else if (response) {
+                // Si la respuesta es directamente el proveedor
+                setSuppliers(prev => prev.map(s => 
+                    s.id === supplierId ? response : s
+                ));
+                showAlert('success', 'Proveedor actualizado', 'El proveedor se ha actualizado exitosamente.');
+                return { success: true, data: response };
+            }
+        } catch (err) {
+            console.error('Error actualizando proveedor:', err);
+            
+            // Manejar errores de validación específicos del backend
+            if (err.response && err.response.data) {
+                const errorData = err.response.data;
+                let errorMessage = '';
+                
+                // Procesar errores de validación campo por campo
+                const fieldErrors = [];
+                if (errorData.website) {
+                    fieldErrors.push(`Sitio web: ${errorData.website.join(', ')}`);
+                }
+                if (errorData.cuit) {
+                    fieldErrors.push(`CUIT: ${errorData.cuit.join(', ')}`);
+                }
+                if (errorData.email) {
+                    fieldErrors.push(`Email: ${errorData.email.join(', ')}`);
+                }
+                if (errorData.name) {
+                    fieldErrors.push(`Nombre: ${errorData.name.join(', ')}`);
+                }
+                if (errorData.phone) {
+                    fieldErrors.push(`Teléfono: ${errorData.phone.join(', ')}`);
+                }
+                
+                if (fieldErrors.length > 0) {
+                    errorMessage = fieldErrors.join(' | ');
+                } else {
+                    errorMessage = 'Por favor revisa los datos ingresados.';
+                }
+                
+                showAlert('danger', 'Error de validación', errorMessage);
+                return { 
+                    success: false, 
+                    error: errorMessage,
+                    validationErrors: errorData 
+                };
+            }
+            
+            showAlert('danger', 'Error al actualizar proveedor', 'No se pudo actualizar el proveedor. Intenta nuevamente.');
+            return { success: false, error: err.message };
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Manejar eliminación de proveedor
     const handleDeleteSupplier = async (supplier) => {
         try {
@@ -178,6 +248,7 @@ const SuppliersPage = () => {
                     error={null} // Ya no pasamos el error aquí, usamos Alert
                     onDeleteSupplier={handleDeleteSupplier}
                     onCreateSupplier={handleCreateSupplier}
+                    onUpdateSupplier={handleUpdateSupplier}
                     searchTerm={searchTerm}
                     onSearchChange={(term) => setSearchTerm(term)}
                     showActions={showActions}

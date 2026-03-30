@@ -14,7 +14,7 @@ import {
   FaMoneyCheckAlt,
   FaShippingFast,
   FaHandshake,
-  FaBoxTissue,
+  FaFolder,
   FaBoxOpen,
   FaCog,
 } from "react-icons/fa";
@@ -35,8 +35,9 @@ export const getSidebarItems = (router) => [
     icon: <FaBoxes />,
     dropdown: [
       { label: "Productos", icon: <FaList />, onClick: () => router.push("/products") },
+      { label: "Categorías", icon: <FaFolder />, onClick: () => router.push("/categories") },
       { label: "Stock", icon: <FaBoxOpen />, onClick: () => router.push("/stock") },
-      { label: "Depósitos", icon: <FaWarehouse />, onClick: () => router.push("/wharehouses") },
+      { label: "Depósitos", icon: <FaWarehouse />, onClick: () => router.push("/warehouses") },
     ],
   },
   { label: "Proveedores", icon: <FaTruck />, onClick: () => router.push("/suppliers") },
@@ -46,7 +47,7 @@ export const getSidebarItems = (router) => [
     icon: <FaTools />,
     dropdown: [
       { label: "Ventas", icon: <FaHandshake />, onClick: () => router.push("/admin/sales") },
-      { label: "Compras", icon: <FaPlus />, onClick: () => router.push("/admin/purchases") },
+      { label: "Compras", icon: <FaPlus />, onClick: () => router.push("/admin/purchase") },
       { label: "Estadísticas", icon: <FaChartLine />, onClick: () => router.push("")  }
     ],
   },
@@ -55,7 +56,7 @@ export const getSidebarItems = (router) => [
     label: "Ecommerce",
     icon: <FaStore />,
     dropdown: [
-      { label: "Configurar tienda", icon: <FaCog />, onClick: () => router.push("/store/conf") },
+      { label: "Configurar tienda", icon: <FaCog />, onClick: () => router.push("/profile") },
       { label: "Métodos de pago", icon: <FaMoneyCheckAlt />, onClick: () => router.push("/ecommerce/payments") },
       { label: "Métodos de envío", icon: <FaShippingFast />, onClick: () => router.push("/ecommerce/shipping") },
     ],

@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { FaBuilding, FaPlus, FaEdit, FaTrash, FaSearch, FaFilter, FaEye, FaEnvelope, FaPhone, FaGlobe, FaMapMarkerAlt, FaSpinner } from "react-icons/fa";
-import Link from "next/link";
+import { FaBuilding, FaPlus, FaEdit, FaTrash, FaSearch, FaEnvelope, FaPhone, FaGlobe, FaMapMarkerAlt, FaSpinner } from "react-icons/fa";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
 import SupplierModal from "@/components/suppliers/SupplierModal";
 
@@ -11,6 +10,7 @@ export default function SupplierTable({
     error = null, 
     onDeleteSupplier,
     onCreateSupplier,
+    onUpdateSupplier,
     searchTerm = "",
     onSearchChange,
     showActions = true 
@@ -21,6 +21,7 @@ export default function SupplierTable({
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, supplier: null });
     const [isDeleting, setIsDeleting] = useState(false);
     const [supplierModal, setSupplierModal] = useState(false);
+    const [editingSupplier, setEditingSupplier] = useState(null);
 
     // Efecto para filtrar proveedores
     useEffect(() => {
@@ -85,12 +86,41 @@ export default function SupplierTable({
         }
     };
 
-    // Manejar creación de proveedor
-    const handleCreateSupplier = (supplier) => {
-        if (onCreateSupplier) {
-            onCreateSupplier(supplier);
+    // Manejar creación o actualización de proveedor
+    const handleCreateSupplier = async (supplier) => {
+        if (editingSupplier) {
+            // Modo edición: actualizar proveedor
+            if (onUpdateSupplier) {
+                const result = await onUpdateSupplier(editingSupplier.id, supplier);
+                if (result && result.success) {
+                    setSupplierModal(false);
+                    setEditingSupplier(null);
+                }
+                return result;
+            }
+        } else {
+            // Modo creación: crear nuevo proveedor
+            if (onCreateSupplier) {
+                const result = await onCreateSupplier(supplier);
+                if (result && result.success) {
+                    setSupplierModal(false);
+                    setEditingSupplier(null);
+                }
+                return result;
+            }
         }
+    };
+
+    // Manejar edición de proveedor
+    const handleEditSupplier = (supplier) => {
+        setEditingSupplier(supplier);
+        setSupplierModal(true);
+    };
+
+    // Manejar cierre del modal
+    const handleCloseModal = () => {
         setSupplierModal(false);
+        setEditingSupplier(null);
     };
 
     // Loading state
@@ -153,7 +183,7 @@ export default function SupplierTable({
                             <input
                                 type="text"
                                 placeholder="Buscar por nombre, email, CUIT..."
-                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent"
+                                className="w-full pl-10 text-black pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent"
                                 value={searchTerm}
                                 onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
                             />
@@ -163,7 +193,7 @@ export default function SupplierTable({
                     {/* Filtro de país */}
                     <div className="lg:w-64">
                         <select
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent"
+                            className="w-full px-4 py-3 text-black border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent"
                             value={selectedCountry}
                             onChange={(e) => setSelectedCountry(e.target.value)}
                         >
@@ -274,9 +304,14 @@ export default function SupplierTable({
                                         <div className="flex items-start gap-2">
                                             <FaMapMarkerAlt className="text-gray-400 text-xs mt-1 flex-shrink-0" />
                                             <div className="text-sm text-gray-900">
-                                                <p>{supplier.city || 'Sin ciudad'}</p>
+                                                {supplier.address && (
+                                                    <p className="font-medium">{supplier.address}</p>
+                                                )}
+                                                <p className="text-xs text-gray-600">
+                                                    {supplier.city || 'Sin ciudad'}, {supplier.state || 'Sin provincia'}
+                                                </p>
                                                 <p className="text-xs text-gray-500">
-                                                    {supplier.state || 'Sin provincia'}, {supplier.country || 'Sin país'}
+                                                    {supplier.country || 'Sin país'}
                                                 </p>
                                             </div>
                                         </div>
@@ -294,15 +329,12 @@ export default function SupplierTable({
                                     {showActions && (
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex items-center justify-end gap-2">
-                                                <button className="text-gray-400 hover:text-[#18c29c] transition-colors p-1">
-                                                    <FaEye className="text-sm" />
-                                                </button>
-                                                <Link
-                                                    href={`/suppliers/edit/${supplier.id}`}
+                                                <button
+                                                    onClick={() => handleEditSupplier(supplier)}
                                                     className="text-gray-400 hover:text-blue-600 transition-colors p-1"
                                                 >
                                                     <FaEdit className="text-sm" />
-                                                </Link>
+                                                </button>
                                                 <button 
                                                     onClick={() => handleDeleteSupplier(supplier)}
                                                     className="text-gray-400 hover:text-red-600 transition-colors p-1"
@@ -341,15 +373,12 @@ export default function SupplierTable({
                                             </div>
                                             {showActions && (
                                                 <div className="flex items-center gap-2 ml-2">
-                                                    <button className="text-gray-400 hover:text-[#18c29c] transition-colors p-1">
-                                                        <FaEye className="text-sm" />
-                                                    </button>
-                                                    <Link
-                                                        href={`/suppliers/edit/${supplier.id}`}
+                                                    <button
+                                                        onClick={() => handleEditSupplier(supplier)}
                                                         className="text-gray-400 hover:text-blue-600 transition-colors p-1"
                                                     >
                                                         <FaEdit className="text-sm" />
-                                                    </Link>
+                                                    </button>
                                                     <button 
                                                         onClick={() => handleDeleteSupplier(supplier)}
                                                         className="text-gray-400 hover:text-red-600 transition-colors p-1"
@@ -376,17 +405,25 @@ export default function SupplierTable({
                                             )}
                                         </div>
                                         
-                                        <div className="mt-3 grid grid-cols-2 gap-4 text-xs">
+                                        <div className="mt-3 space-y-2 text-xs">
                                             <div>
                                                 <span className="text-gray-500">CUIT:</span>
                                                 <p className="font-medium text-gray-900 font-mono">
                                                     {supplier.cuit || 'Sin CUIT'}
                                                 </p>
                                             </div>
+                                            {supplier.address && (
+                                                <div>
+                                                    <span className="text-gray-500">Dirección:</span>
+                                                    <p className="font-medium text-gray-900">
+                                                        {supplier.address}
+                                                    </p>
+                                                </div>
+                                            )}
                                             <div>
                                                 <span className="text-gray-500">Ubicación:</span>
                                                 <p className="font-medium text-gray-900">
-                                                    {supplier.city || 'Sin ciudad'}
+                                                    {supplier.city || 'Sin ciudad'}, {supplier.state || 'Sin provincia'}
                                                 </p>
                                             </div>
                                             <div>
@@ -445,12 +482,13 @@ export default function SupplierTable({
                 deleteButtonText="Eliminar Proveedor"
             />
 
-            {/* Modal de agregar proveedor */}
+            {/* Modal de agregar/editar proveedor */}
             <SupplierModal
                 open={supplierModal}
-                onClose={() => setSupplierModal(false)}
-                mode="create"
+                onClose={handleCloseModal}
+                mode={editingSupplier ? "edit" : "create"}
                 onCreateSupplier={handleCreateSupplier}
+                supplierToEdit={editingSupplier}
             />
         </div>
     );

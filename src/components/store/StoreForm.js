@@ -1,11 +1,22 @@
 "use client";
 import React, { useState } from "react";
-import { FaStore, FaUpload, FaMapMarkerAlt, FaPhone, FaToggleOn, FaToggleOff, FaMapPin, FaGlobe, FaCity, FaMailBulk, FaSpinner } from "react-icons/fa";
+import { FaStore, FaUpload, FaMapMarkerAlt, FaPhone, FaToggleOn, FaToggleOff, FaMapPin, FaGlobe, FaCity, FaMailBulk, FaSpinner, FaPalette, FaCheck } from "react-icons/fa";
 
 export default function StoreForm({ store, onChange, onSave, loading = false, readOnly = false }) {
+    // Paletas predeterminadas
+    const themeOptions = [
+        { id: "wine", name: "Vino", primary: "#9a334d", secondary: "#7a2639" },
+        { id: "ocean", name: "Océano", primary: "#3498db", secondary: "#2980b9" },
+        { id: "purple", name: "Púrpura", primary: "#9c27b0", secondary: "#7b1fa2" },
+        { id: "mint", name: "Menta", primary: "#00bfa5", secondary: "#009688" },
+        { id: "coral", name: "Coral", primary: "#ff7256", secondary: "#e05a44" },
+        { id: "nordic", name: "Nórdico", primary: "#4a6fa5", secondary: "#3b5683" }
+    ];
+
     const [formData, setFormData] = useState(store || {
         name: "",
         logo: null,
+        dark_mode: false,
         country: "",
         state: "",
         postal_code: "",
@@ -13,7 +24,8 @@ export default function StoreForm({ store, onChange, onSave, loading = false, re
         address: "",
         phone: "",
         is_active: false,
-        view_only: true
+        view_only: true,
+        theme_id: "wine",
     });
 
     const [logoPreview, setLogoPreview] = useState(store?.logo || null);
@@ -24,13 +36,31 @@ export default function StoreForm({ store, onChange, onSave, loading = false, re
         const { name, value, type, checked } = e.target;
         const newValue = type === "checkbox" ? checked : value;
         
-        setFormData(prev => ({
-            ...prev,
-            [name]: newValue
-        }));
+        let updatedData = { ...formData, [name]: newValue };
+        
+        setFormData(updatedData);
         
         if (onChange) {
-            onChange({ ...formData, [name]: newValue });
+            onChange(updatedData);
+        }
+    };
+
+    const handleThemeSelect = (themeId) => {
+        if (readOnly) return;
+        
+        const selectedTheme = themeOptions.find(theme => theme.id === themeId);
+        
+        const updatedData = {
+            ...formData,
+            theme_id: themeId,
+            pallete_color: selectedTheme.primary,
+            secondary_color: selectedTheme.secondary
+        };
+        
+        setFormData(updatedData);
+        
+        if (onChange) {
+            onChange(updatedData);
         }
     };
 
@@ -106,6 +136,111 @@ export default function StoreForm({ store, onChange, onSave, loading = false, re
                                 {readOnly ? "Logo de la tienda" : "Tamaño recomendado: 100x100px"}
                             </p>
                         </div>
+                    </div>
+                </div>
+
+                {/* Configuración visual - modificada */}
+                <div className="border border-gray-200 rounded-lg p-4 md:p-6">
+                    <h3 className="text-base md:text-lg font-semibold text-[#223263] mb-3 md:mb-4 flex items-center gap-2">
+                        <FaPalette className="text-[#18c29c] text-sm md:text-base" />
+                        Selección de tema
+                    </h3>
+                    
+                    {/* Selección de temas disponibles */}
+                    <div className="mb-6">
+                        <label className="block text-xs md:text-sm font-semibold text-[#223263] mb-3">
+                            Temas disponibles 
+                        </label>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            {themeOptions.map((theme) => {
+                                const isSelected = formData.theme_id === theme.id;
+                                return (
+                                    <button
+                                        key={theme.id}
+                                        type="button"
+                                        onClick={() => !readOnly && handleThemeSelect(theme.id)}
+                                        className={`relative p-4 rounded-lg border-2 transition-all duration-200 ${
+                                            isSelected 
+                                                ? 'border-blue-500 bg-blue-50' 
+                                                : 'border-gray-200 hover:border-gray-300'
+                                        } ${readOnly ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+                                        disabled={readOnly}
+                                    >
+                                        {/* Indicador de selección */}
+                                        {isSelected && (
+                                            <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                                                <FaCheck className="text-white text-xs" />
+                                            </div>
+                                        )}
+                                        
+                                        <div className="flex flex-col items-center space-y-3">
+                                            {/* Gradiente de muestra */}
+                                            <div 
+                                                className="w-full h-12 rounded-md border border-gray-200 shadow-sm"
+                                                style={{
+                                                    background: `linear-gradient(135deg, ${theme.primary} 0%, ${theme.secondary} 100%)`
+                                                }}
+                                            />
+                                            
+                                            {/* Nombre del tema */}
+                                            <p className="text-sm font-medium text-gray-700 text-center">
+                                                {theme.name}
+                                            </p>
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    
+                    {/* Vista previa del tema seleccionado */}
+                    <div className="mt-4 md:mt-6">
+                        <label className="block text-xs md:text-sm font-semibold text-[#223263] mb-2">
+                            Vista previa del tema: <span className="font-normal">{themeOptions.find(t => t.id === formData.theme_id)?.name}</span>
+                        </label>
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <div 
+                                    className="h-12 md:h-16 rounded-lg border border-gray-200 flex items-center justify-center text-white font-semibold text-sm md:text-base"
+                                    style={{ backgroundColor: formData.pallete_color }}
+                                >
+                                    Primario
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <div 
+                                    className="h-12 md:h-16 rounded-lg border border-gray-200 flex items-center justify-center text-white font-semibold text-sm md:text-base"
+                                    style={{ backgroundColor: formData.secondary_color }}
+                                >
+                                    Secundario
+                                </div>
+                            </div>
+                            <div className="flex-1">
+                                <div 
+                                    className="h-12 md:h-16 rounded-lg border border-gray-200 flex items-center justify-center text-white font-semibold text-sm md:text-base"
+                                    style={{ background: `linear-gradient(135deg, ${formData.pallete_color} 0%, ${formData.secondary_color} 100%)` }}
+                                >
+                                    Gradiente
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex items-start sm:items-center justify-between gap-3 mt-6 md:mt-8">
+                        <div className="flex-1">
+                            <h4 className="text-sm md:text-base font-semibold text-[#223263]">Modo oscuro</h4>
+                            <p className="text-xs md:text-sm text-gray-600 mt-1">Selecciona si prefieres una tonalidad más oscura o clara para tu tienda</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => !readOnly && handleChange({ target: { name: 'dark_mode', type: 'checkbox', checked: !formData.dark_mode } })}
+                            className={`flex items-center text-2xl md:text-3xl transition-colors flex-shrink-0 ${
+                                formData.dark_mode ? 'text-[#18c29c]' : 'text-gray-400'
+                            } ${readOnly ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                            disabled={readOnly}
+                        >
+                            {formData.dark_mode ? <FaToggleOn /> : <FaToggleOff />}
+                        </button>
                     </div>
                 </div>
 

@@ -26,7 +26,6 @@ class CrmService {
         
         try {
             const response = await this.apiMethods.getMethod('/crm/customers/', params);
-            console.log(response)
             return response;
         } catch (error) {
             console.error('Error fetching customers:', error);
@@ -152,7 +151,7 @@ class CrmService {
         if (!this.apiMethods) throw new Error('CrmService not initialized');
         
         try {
-            const response = await this.apiMethods.getMethod(`/crm/customers/${customerId}/contact-history/`);
+            const response = await this.apiMethods.getMethod(`/crm/customers/${customerId}/contact_history/`);
             return response;
         } catch (error) {
             console.error('Error fetching contact history:', error);
@@ -170,7 +169,7 @@ class CrmService {
         if (!this.apiMethods) throw new Error('CrmService not initialized');
         
         try {
-            const response = await this.apiMethods.patchMethod(`/crm/customers/${customerId}/update-contact/`, contactData);
+            const response = await this.apiMethods.patchMethod(`/crm/customers/${customerId}/update_contact/`, contactData);
             return response;
         } catch (error) {
             console.error('Error updating contact:', error);
@@ -188,9 +187,10 @@ class CrmService {
         if (!this.apiMethods) throw new Error('CrmService not initialized');
         
         try {
-            const response = await this.apiMethods.deleteMethod(`/crm/customers/${customerId}/delete-contact/`, {
-                contact_index: contactIndex
-            });
+            const response = await this.apiMethods.deleteMethod(
+                `/crm/customers/${customerId}/delete_contact/`,
+                { contact_index: contactIndex }
+            );
             return response;
         } catch (error) {
             console.error('Error deleting contact:', error);
@@ -260,14 +260,22 @@ class CrmService {
     /**
      * Formatear datos de cliente para display
      * @param {Object} customer - Datos del cliente
-     * @returns {Object} Cliente formateado
+     * @returns {Object} Cliente formateado (mantiene todos los campos originales)
      */
     formatCustomerForDisplay(customer) {
+        // Construir display_name basado en el tipo de cliente
+        let displayName = '';
+        if (customer.customer_type === 'person') {
+            // Para personas: "Nombre Apellido"
+            displayName = `${customer.first_name || ''} ${customer.last_name || ''}`.trim();
+        } else {
+            // Para empresas: nombre de fantasía o razón social
+            displayName = customer.fantasy_name || customer.name || '';
+        }
+
         return {
-            ...customer,
-            display_name: customer.customer_type === 'person' 
-                ? `${customer.first_name} ${customer.last_name}`.trim()
-                : customer.full_name || customer.fantasy_name,
+            ...customer, // Mantener TODOS los campos originales
+            display_name: displayName || customer.display_name || 'Sin nombre',
             formatted_total_spent: new Intl.NumberFormat('es-AR', {
                 style: 'currency',
                 currency: 'ARS'

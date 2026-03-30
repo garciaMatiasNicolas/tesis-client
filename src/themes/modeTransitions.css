@@ -1,0 +1,19 @@
+/* Mode transitions for wine store */
+.wine-store-page {
+  transition: all 0.3s ease-in-out;
+}
+
+/* For text with gradient background that transitions smoothly */
+.wine-text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: all 0.3s ease-in-out;
+}
+
+/* Fade transition for background elements */
+.wine-bg-transition {
+  transition: background-color 0.3s ease-in-out, 
+              border-color 0.3s ease-in-out,
+              box-shadow 0.3s ease-in-out;
+}

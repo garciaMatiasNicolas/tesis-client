@@ -207,6 +207,7 @@ const EmployeesPage = () => {
             }
         } finally {
             setSaving(false);
+            loadAllData();
         }
     };
 
@@ -229,6 +230,7 @@ const EmployeesPage = () => {
             setSelectedEmployee(null);
         } finally {
             setSaving(false);
+            loadAllData();
         }
     };
 
@@ -313,6 +315,7 @@ const EmployeesPage = () => {
                         onSubmit={handleSubmitEmployee}
                         loading={saving}
                         currentUser={currentUser}
+                        staticBackdrop={true}
                     />
 
                     {/* Modal de confirmación de eliminación */}

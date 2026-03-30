@@ -31,7 +31,7 @@ const useEmailValidation = (delay = 800) => {
 
         try {
             // Verificar disponibilidad en el backend
-            const response = await getMethod(`/check-email/?email=${encodeURIComponent(email)}`);
+            const response = await getMethod(`/check-email/?email=${encodeURIComponent(email)}`, {}, false);
             
             setEmailStatus({
                 isValidating: false,

@@ -75,7 +75,7 @@ export default function AuthForm({
                         Bienvenido de vuelta
                     </h2>
                     <p className="text-gray-500 text-sm">
-                        Inicia sesión para continuar con Upzet
+                        Inicia sesión para continuar 
                     </p>
                 </div>
             }

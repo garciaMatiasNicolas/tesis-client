@@ -1,6 +1,8 @@
 "use client";
 import CustomerTable from '@/components/crm/CustomerTable';
 import CustomerFormModal from '@/components/crm/CustomerFormModal';
+import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
+import Alert from '@/components/ui/Alert';
 import SideBar from '@/components/ui/SideBar';
 import useApiMethods from '@/hooks/useApiMethods';
 import crmService from '@/services/crmService';
@@ -24,6 +26,14 @@ const CrmPage = () => {
     const [showModal, setShowModal] = React.useState(false);
     const [modalLoading, setModalLoading] = React.useState(false);
     const [editingCustomer, setEditingCustomer] = React.useState(null);
+    
+    // Estados para el modal de eliminación
+    const [showDeleteModal, setShowDeleteModal] = React.useState(false);
+    const [customerToDelete, setCustomerToDelete] = React.useState(null);
+    const [isDeleting, setIsDeleting] = React.useState(false);
+    
+    // Estado para alertas
+    const [alert, setAlert] = React.useState(null);
 
     const apiMethods = useApiMethods();
 
@@ -160,28 +170,55 @@ const CrmPage = () => {
     };
 
     // Manejar eliminación de cliente
-    const handleDeleteCustomer = async (customer) => {
-        try {
-            const confirmDelete = window.confirm(
-                `¿Estás seguro de que deseas eliminar a ${customer.display_name}?`
-            );
-            
-            if (!confirmDelete) return;
+    const handleDeleteCustomer = (customer) => {
+        setCustomerToDelete(customer);
+        setShowDeleteModal(true);
+    };
 
-            setLoading(true);
-            await crmService.deleteCustomer(customer.id);
+    // Confirmar eliminación de cliente
+    const confirmDeleteCustomer = async () => {
+        setShowDeleteModal(false);
+        if (!customerToDelete) return;
+        
+        try {
+            setIsDeleting(true);
+            await crmService.deleteCustomer(customerToDelete.id);
             
             // Recargar la lista de clientes
             await loadCustomers();
             await loadStats();
             
-            console.log("Cliente eliminado exitosamente:", customer.id);
+            // Mostrar alert de éxito
+            setAlert({
+                type: 'success',
+                title: 'Cliente eliminado',
+                message: `El cliente "${customerToDelete.display_name}" ha sido eliminado exitosamente.`
+            });
+            
+            // Auto-ocultar después de 5 segundos
+            setTimeout(() => setAlert(null), 5000);
+            
+            // Limpiar estado
+            setCustomerToDelete(null);
         } catch (err) {
             console.error('Error deleting customer:', err);
-            setError('Error al eliminar el cliente. Por favor, intenta nuevamente.');
+            
+            // Mostrar alert de error
+            const errorMessage = err.response?.data?.error || 'Error al eliminar el cliente. Por favor, intenta nuevamente.';
+            setAlert({
+                type: 'danger',
+                title: 'Error al eliminar cliente',
+                message: errorMessage
+            });
         } finally {
-            setLoading(false);
+            setIsDeleting(false);
         }
+    };
+
+    // Cancelar eliminación
+    const cancelDeleteCustomer = () => {
+        setShowDeleteModal(false);
+        setCustomerToDelete(null);
     };
 
     // Manejar actualización de cliente
@@ -234,6 +271,16 @@ const CrmPage = () => {
 
     return (
         <div className="flex min-h-screen bg-[#f8fafc]">
+            {/* Alert component */}
+            {alert && (
+                <Alert
+                    type={alert.type}
+                    title={alert.title}
+                    message={alert.message}
+                    onClose={() => setAlert(null)}
+                />
+            )}
+            
             <SideBar
                 onProfile={() => window.location.href = "/profile"}
                 onSupport={() => alert("Soporte")}
@@ -263,6 +310,16 @@ const CrmPage = () => {
                     onSubmit={handleModalSubmit}
                     loading={modalLoading}
                     customer={editingCustomer}
+                />
+
+                {/* Modal de confirmación de eliminación */}
+                <DeleteConfirmationModal
+                    isOpen={showDeleteModal}
+                    onClose={cancelDeleteCustomer}
+                    onConfirm={confirmDeleteCustomer}
+                    itemName={customerToDelete?.display_name}
+                    itemType="cliente"
+                    isDeleting={isDeleting}
                 />
             </main>
         </div>

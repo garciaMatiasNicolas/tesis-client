@@ -45,6 +45,11 @@ const LoginPage = () => {
                 setAlertTitle("Error");
                 setAlertType("danger");
                 setShowAlert(true);
+            } else if (err?.response?.data?.error === "not_authorized") {
+                setAlertMessage("Cliente no autorizado para ingresar al portal.");
+                setAlertTitle("Error");
+                setAlertType("danger");
+                setShowAlert(true);
             } else {
                 setAlertMessage("Ocurrió un error al iniciar sesión. Si persiste, contactar a soporte.");
                 setAlertTitle("Error");

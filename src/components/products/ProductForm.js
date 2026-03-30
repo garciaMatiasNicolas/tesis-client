@@ -1,7 +1,6 @@
 "use client";
 import React, { useRef, useState, useEffect } from "react";
-import { FaCamera, FaYoutube, FaDollarSign, FaTag, FaWeight, FaRulerVertical, FaRulerHorizontal, FaCube, FaBoxes, FaSpinner } from "react-icons/fa";
-import SupplierModal from "../suppliers/SupplierModal";
+import { FaCamera, FaDollarSign, FaTag, FaWeight, FaRulerVertical, FaRulerHorizontal, FaCube, FaBoxes, FaSpinner } from "react-icons/fa";
 import useProductService from "@/services/productService";
 import Alert from "@/components/ui/Alert";
 
@@ -19,12 +18,19 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
     height: '',
     width: '',
     depth: '',
-    storage_unit: '',
+    safety_stock: '',
+    unit_type: 'count',
+    base_unit_name: 'unit',
     show_price: true,
     promotional_price: '',
-    video_url: '',
     product_type: 'physical'
   });
+  
+  // Product units for conversion
+  const [productUnits, setProductUnits] = useState([]);
+  const [originalProductUnits, setOriginalProductUnits] = useState([]); // Para trackear unidades al editar
+  const [newUnitName, setNewUnitName] = useState('');
+  const [newUnitFactor, setNewUnitFactor] = useState('');
   
   // Related data states
   const [categories, setCategories] = useState([]);
@@ -35,16 +41,10 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState('');
   const [selectedSupplier, setSelectedSupplier] = useState(null);
-  const [supplierCost, setSupplierCost] = useState('');
-  
-  // New items
-  const [newCategory, setNewCategory] = useState('');
-  const [newSubcategory, setNewSubcategory] = useState('');
   
   // UI states
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [supplierModalOpen, setSupplierModalOpen] = useState(false);
   
   // Alert states
   const [alert, setAlert] = useState(null);
@@ -174,16 +174,31 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
             height: product.height || '',
             width: product.width || '',
             depth: product.depth || '',
-            storage_unit: product.storage_unit || '',
+            safety_stock: product.safety_stock ?? '',
+            unit_type: product.unit_type || 'count',
+            base_unit_name: product.base_unit_name || 'unit',
             show_price: product.show_price !== false,
             promotional_price: product.promotional_price || '',
-            video_url: product.video_url || '',
             product_type: product.product_type || 'physical'
           });
           
           setSelectedCategory(product.category?.id || '');
           setSelectedSubcategory(product.subcategory?.id || '');
           setSelectedSupplier(product.supplier || null);
+          
+          // Load product units if editing
+          try {
+            const units = await productService.getProductUnits(product.id);
+            const formattedUnits = units.map(u => ({
+              id: u.id,
+              name: u.name,
+              conversion_factor: parseFloat(u.conversion_factor)
+            }));
+            setProductUnits(formattedUnits);
+            setOriginalProductUnits(formattedUnits); // Guardar copia para comparar eliminaciones
+          } catch (error) {
+            console.error('Error al cargar unidades del producto:', error);
+          }
         }
       } catch (error) {
         console.error('Error loading initial data:', error);
@@ -203,54 +218,37 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
     }));
   };
 
-  // Handle category creation
-  const handleCreateCategory = async () => {
-    if (!newCategory.trim()) return;
-    
-    try {
-      const categoryData = { name: newCategory.trim() };
-      const newCat = await productService.createCategory(categoryData);
-      setCategories(prev => [...prev, newCat]);
-      setSelectedCategory(newCat.id);
-      setNewCategory('');
-      showAlert('success', 'Categoría creada', `Categoría "${newCategory.trim()}" fue creada con éxito`);
-    } catch (error) {
-      console.error('Error creating category:', error);
-      
-      const validationErrors = parseValidationErrors(error);
-      if (validationErrors) {
-        showAlert('danger', 'Error de validación', validationErrors);
-      } else {
-        showAlert('danger', 'Error', 'Error al crear la categoría. Por favor, inténtalo de nuevo.');
-      }
+  // Handle adding a new product unit
+  const handleAddProductUnit = () => {
+    if (!newUnitName.trim() || !newUnitFactor || parseFloat(newUnitFactor) <= 0) {
+      showAlert('warning', 'Datos incompletos', 'Por favor completa el nombre y el factor de conversión (debe ser mayor a 0).');
+      return;
     }
+    
+    const newUnit = {
+      id: Date.now(), // Temporary ID for new units
+      name: newUnitName.trim(),
+      conversion_factor: parseFloat(newUnitFactor)
+    };
+    
+    setProductUnits(prev => [...prev, newUnit]);
+    setNewUnitName('');
+    setNewUnitFactor('');
   };
 
-  // Handle subcategory creation
-  const handleCreateSubcategory = async () => {
-    if (!newSubcategory.trim() || !selectedCategory) return;
-    
-    try {
-      const subcategoryData = { 
-        name: newSubcategory.trim(),
-        category: selectedCategory 
-      };
-      const newSubcat = await productService.createSubcategory(subcategoryData);
-      setSubcategories(prev => [...prev, newSubcat]);
-      setSelectedSubcategory(newSubcat.id);
-      setNewSubcategory('');
-      showAlert('success', 'Subcategoría creada', `Subcategoría "${newSubcategory.trim()}" fue creada con éxito`);
-    } catch (error) {
-      console.error('Error creating subcategory:', error);
-      
-      const validationErrors = parseValidationErrors(error);
-      if (validationErrors) {
-        showAlert('danger', 'Error de validación', validationErrors);
-      } else {
-        showAlert('danger', 'Error', 'Error al crear la subcategoría. Por favor, inténtalo de nuevo.');
-      }
-    }
+  // Handle removing a product unit
+  const handleRemoveProductUnit = (unitId) => {
+    setProductUnits(prev => prev.filter(u => u.id !== unitId));
   };
+
+  // Handle editing a product unit
+  const handleEditProductUnit = (unitId, field, value) => {
+    setProductUnits(prev => prev.map(u => 
+      u.id === unitId ? { ...u, [field]: value } : u
+    ));
+  };
+
+
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -272,6 +270,7 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
         price: parseFloat(formData.price) || 0,
         cost_price: parseFloat(formData.cost_price) || 0,
         promotional_price: parseFloat(formData.promotional_price) || null,
+        safety_stock: parseFloat(formData.safety_stock) || 0,
         weight: parseFloat(formData.weight) || null,
         height: parseFloat(formData.height) || null,
         width: parseFloat(formData.width) || null,
@@ -283,6 +282,54 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
         result = await productService.updateProduct(product.id, productData);
       } else {
         result = await productService.createProduct(productData);
+      }
+      
+      // Gestionar Product Units después de crear/actualizar el producto
+      const productId = result.id;
+      
+      // 1. Identificar unidades nuevas (id temporal), existentes y eliminadas
+      const newUnits = productUnits.filter(u => u.id > 1000000000000); // IDs temporales de Date.now()
+      const existingUnits = productUnits.filter(u => u.id <= 1000000000000); // IDs reales del backend
+      const deletedUnits = originalProductUnits.filter(
+        origUnit => !productUnits.find(u => u.id === origUnit.id)
+      );
+      
+      // 2. Crear nuevas unidades
+      for (const unit of newUnits) {
+        try {
+          await productService.createProductUnit({
+            product: productId,
+            name: unit.name,
+            conversion_factor: unit.conversion_factor
+          });
+        } catch (error) {
+          console.error('Error al crear unidad:', error);
+          showAlert('warning', 'Error parcial', `No se pudo crear la unidad "${unit.name}"`);
+        }
+      }
+      
+      // 3. Actualizar unidades existentes
+      for (const unit of existingUnits) {
+        try {
+          await productService.updateProductUnit(unit.id, {
+            product: productId,
+            name: unit.name,
+            conversion_factor: unit.conversion_factor
+          });
+        } catch (error) {
+          console.error('Error al actualizar unidad:', error);
+          showAlert('warning', 'Error parcial', `No se pudo actualizar la unidad "${unit.name}"`);
+        }
+      }
+      
+      // 4. Eliminar unidades que fueron removidas
+      for (const unit of deletedUnits) {
+        try {
+          await productService.deleteProductUnit(unit.id);
+        } catch (error) {
+          console.error('Error al eliminar unidad:', error);
+          showAlert('warning', 'Error parcial', `No se pudo eliminar la unidad "${unit.name}"`);
+        }
       }
       
       if (onProductCreated) {
@@ -303,15 +350,19 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
             height: '',
             width: '',
             depth: '',
-            storage_unit: '',
+            safety_stock: '',
+            unit_type: 'count',
+            base_unit_name: 'unit',
             show_price: true,
             promotional_price: '',
-            video_url: '',
             product_type: 'physical'
           });
           setSelectedCategory('');
           setSelectedSubcategory('');
           setSelectedSupplier(null);
+          setProductUnits([]);
+          setNewUnitName('');
+          setNewUnitFactor('');
         }
       }
     } catch (error) {
@@ -330,7 +381,11 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
 
   // Filter subcategories by selected category
   const filteredSubcategories = subcategories.filter(
-    sub => sub.category === selectedCategory || sub.category_id === selectedCategory
+    sub => {
+      if (!selectedCategory) return false;
+      const categoryId = parseInt(selectedCategory);
+      return sub.category === categoryId || sub.category_id === categoryId;
+    }
   );
 
   if (loading) {
@@ -342,7 +397,9 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
         </div>
       </div>
     );
-  }
+  };
+
+
 
   return (
     <div className="flex justify-center items-start min-h-screen w-full bg-[#f8fafc]">
@@ -423,23 +480,6 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
             </div>
           </div>
 
-          {/* Video */}
-          <div className="mb-6">
-            <label className="block font-semibold mb-2 text-gray-800 flex items-center gap-2">
-              <FaYoutube className="text-[#FF0000]" /> Video URL
-            </label>
-            <input
-              type="url"
-              placeholder="YouTube or Vimeo link about your product"
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
-              value={formData.video_url}
-              onChange={(e) => handleInputChange('video_url', e.target.value)}
-            />
-            <span className="text-xs text-gray-500">
-              e.g: https://www.youtube.com/watch?v=1sHECDDS-zc
-            </span>
-          </div>
-
           {/* Pricing */}
           <div className="mb-6 flex flex-wrap gap-6">
             <div className="flex-1 min-w-[250px]">
@@ -474,6 +514,20 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
                 />
               </div>
             </div>
+            <div className="flex-1 min-w-[250px]">
+              <label className="block text-sm mb-1 text-gray-800 flex items-center gap-1">
+                <FaBoxes className="text-[#18c29c]" /> Stock de seguridad
+              </label>
+              <input
+                type="number"
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+                min="0"
+                step="0.0001"
+                placeholder="Cantidad mínima recomendada"
+                value={formData.safety_stock}
+                onChange={(e) => handleInputChange('safety_stock', e.target.value)}
+              />
+            </div>
             <div className="flex items-center mt-4 md:mt-7 min-w-[250px]">
               <input 
                 type="checkbox" 
@@ -488,25 +542,24 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
           {/* Supplier */}
           <div className="mb-6">
             <label className="block font-semibold mb-2 text-gray-800">
-              ¿El producto proviene de un proveedor externo?
+              Proveedor (opcional)
             </label>
-            <button
-              type="button"
-              className="bg-[#18c29c] text-white px-4 py-2 rounded hover:bg-[#15a884] transition"
-              onClick={() => setSupplierModalOpen(true)}
+            <select
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+              value={selectedSupplier?.id || ''}
+              onChange={(e) => {
+                const supplierId = e.target.value;
+                const supplier = suppliers.find(s => s.id === parseInt(supplierId));
+                setSelectedSupplier(supplier || null);
+              }}
             >
-              {selectedSupplier ? "Cambiar proveedor" : "Seleccionar proveedor"}
-            </button>
-            {selectedSupplier && (
-              <div className="mt-2 text-gray-900">
-                <span className="font-semibold">Proveedor:</span> {selectedSupplier.name} <br />
-                {supplierCost && (
-                  <>
-                    <span className="font-semibold">Costo:</span> ${supplierCost}
-                  </>
-                )}
-              </div>
-            )}
+              <option value="">Seleccionar proveedor</option>
+              {suppliers.map(supplier => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Product Type */}
@@ -590,18 +643,160 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
                   onChange={(e) => handleInputChange('depth', e.target.value)}
                 />
               </div>
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm mb-1 text-gray-800 flex items-center gap-1">
-                  <FaBoxes className="text-[#18c29c]" /> Unidad de Almacenamiento
-                </label>
-                <input
-                  type="text"
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
-                  placeholder="e.g: Caja, Bolsa, Pallet"
-                  value={formData.storage_unit}
-                  onChange={(e) => handleInputChange('storage_unit', e.target.value)}
-                />
+            </div>
+          )}
+
+          {/* Unit Type and Base Unit */}
+          <div className="mb-6 flex flex-wrap gap-6">
+            <div className="flex-1 min-w-[250px]">
+              <label className="block font-semibold mb-2 text-gray-800">
+                Tipo de Unidad <span className="text-red-500">*</span>
+              </label>
+              <select
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+                value={formData.unit_type}
+                onChange={(e) => handleInputChange('unit_type', e.target.value)}
+                required
+              >
+                <option value="count">Recuento (Unidades)</option>
+                <option value="weight">Peso (Kilos/Gramos)</option>
+                <option value="volume">Volumen (Litros/Mililitros)</option>
+              </select>
+            </div>
+            <div className="flex-1 min-w-[250px]">
+              <label className="block font-semibold mb-2 text-gray-800">
+                Unidad Base <span className="text-red-500">*</span>
+              </label>
+              <select
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+                value={formData.base_unit_name}
+                onChange={(e) => handleInputChange('base_unit_name', e.target.value)}
+                required
+              >
+                <option value="unit">Unidad</option>
+                <option value="kg">Kilogramo</option>
+                <option value="g">Gramo</option>
+                <option value="l">Litro</option>
+                <option value="ml">Mililitro</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Product Units Conversion Table */}
+          {formData.unit_type && formData.base_unit_name && (
+            <div className="mb-8 bg-gray-50 p-6 rounded-lg border border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <FaBoxes className="text-[#18c29c]" />
+                Unidades de Conversión
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Define las diferentes unidades de empaque/venta y su factor de conversión respecto a la unidad base ({formData.base_unit_name}).
+              </p>
+
+              {/* Add New Unit Form */}
+              <div className="bg-white p-4 rounded border border-gray-300 mb-4">
+                <div className="flex flex-wrap gap-4 items-end">
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-sm font-medium mb-1 text-gray-800">
+                      Nombre de la Unidad
+                    </label>
+                    <input
+                      type="text"
+                      className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+                      placeholder="ej: Caja, Docena, Pallet"
+                      value={newUnitName}
+                      onChange={(e) => setNewUnitName(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[200px]">
+                    <label className="block text-sm font-medium mb-1 text-gray-800">
+                      Factor de Conversión
+                    </label>
+                    <input
+                      type="number"
+                      className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+                      placeholder="ej: 12 (si 1 caja = 12 unidades)"
+                      min="0.0001"
+                      step="0.0001"
+                      value={newUnitFactor}
+                      onChange={(e) => setNewUnitFactor(e.target.value)}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddProductUnit}
+                    className="bg-[#18c29c] text-white px-6 py-2 rounded font-medium hover:bg-[#15a884] transition"
+                  >
+                    Agregar
+                  </button>
+                </div>
               </div>
+
+              {/* Units Table */}
+              {productUnits.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-white border border-gray-300 rounded">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b border-gray-300">
+                          Unidad
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b border-gray-300">
+                          Factor de Conversión
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-b border-gray-300">
+                          Equivalencia
+                        </th>
+                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-b border-gray-300">
+                          Acciones
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productUnits.map((unit, index) => (
+                        <tr key={unit.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="px-4 py-3 border-b border-gray-200">
+                            <input
+                              type="text"
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-gray-900 text-sm"
+                              value={unit.name}
+                              onChange={(e) => handleEditProductUnit(unit.id, 'name', e.target.value)}
+                            />
+                          </td>
+                          <td className="px-4 py-3 border-b border-gray-200">
+                            <input
+                              type="number"
+                              className="w-full border border-gray-300 rounded px-2 py-1 text-gray-900 text-sm"
+                              min="0.0001"
+                              step="0.0001"
+                              value={unit.conversion_factor}
+                              onChange={(e) => handleEditProductUnit(unit.id, 'conversion_factor', parseFloat(e.target.value))}
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700 border-b border-gray-200">
+                            1 {unit.name} = {unit.conversion_factor} {formData.base_unit_name}
+                          </td>
+                          <td className="px-4 py-3 text-center border-b border-gray-200">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveProductUnit(unit.id)}
+                              className="text-red-600 hover:text-red-800 transition font-medium text-sm"
+                            >
+                              Eliminar
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {productUnits.length === 0 && (
+                <div className="text-center py-6 text-gray-500 text-sm">
+                  No hay unidades de conversión definidas. Agrega una unidad para comenzar.
+                </div>
+              )}
             </div>
           )}
 
@@ -609,68 +804,33 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
           <div className="mb-8 flex flex-wrap gap-6">
             <div className="flex-1 min-w-[250px]">
               <label className="block font-semibold mb-2 text-gray-800">Categoría</label>
-              <div className="flex gap-2 mb-2">
-                <select
-                  className="border border-gray-300 rounded px-3 py-2 text-gray-900 w-full"
-                  value={selectedCategory}
-                  onChange={(e) => {
-                    setSelectedCategory(e.target.value);
-                    setSelectedSubcategory(''); // Reset subcategory when category changes
-                  }}
-                >
-                  <option value="">Seleccionar categoría</option>
-                  {categories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  className="border border-gray-300 rounded px-3 py-2 text-gray-900 w-full"
-                  placeholder="Nueva categoría"
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="bg-[#18c29c] text-white px-3 py-2 rounded hover:bg-[#15a884] transition whitespace-nowrap"
-                  onClick={handleCreateCategory}
-                  disabled={!newCategory.trim()}
-                >
-                  Crear
-                </button>
-              </div>
+              <select
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setSelectedSubcategory(''); // Reset subcategory when category changes
+                }}
+              >
+                <option value="">Seleccionar categoría</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
             </div>
             <div className="flex-1 min-w-[250px]">
               <label className="block font-semibold mb-2 text-gray-800">Subcategoría</label>
-              <div className="flex gap-2">
-                <select
-                  className="border border-gray-300 rounded px-3 py-2 text-gray-900 w-full"
-                  value={selectedSubcategory}
-                  onChange={(e) => setSelectedSubcategory(e.target.value)}
-                  disabled={!selectedCategory}
-                >
-                  <option value="">Seleccionar subcategoría</option>
-                  {filteredSubcategories.map(sub => (
-                    <option key={sub.id} value={sub.id}>{sub.name}</option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  className="border border-gray-300 rounded px-3 py-2 text-gray-900 w-full"
-                  placeholder="Nueva subcategoría"
-                  value={newSubcategory}
-                  onChange={(e) => setNewSubcategory(e.target.value)}
-                  disabled={!selectedCategory}
-                />
-                <button
-                  type="button"
-                  className="bg-[#18c29c] text-white px-3 py-2 rounded hover:bg-[#15a884] transition whitespace-nowrap"
-                  onClick={handleCreateSubcategory}
-                  disabled={!selectedCategory || !newSubcategory.trim()}
-                >
-                  Crear
-                </button>
-              </div>
+              <select
+                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+                value={selectedSubcategory}
+                onChange={(e) => setSelectedSubcategory(e.target.value)}
+                disabled={!selectedCategory}
+              >
+                <option value="">Seleccionar subcategoría</option>
+                {filteredSubcategories.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -699,16 +859,7 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
           </div>
         </form>
         
-        {/* Supplier Modal */}
-        <SupplierModal
-          open={supplierModalOpen}
-          onClose={() => setSupplierModalOpen(false)}
-          onSelectSupplier={(supplier, cost) => {
-            setSelectedSupplier(supplier);
-            setSupplierCost(cost);
-          }}
-          suppliers={suppliers}
-        />
+
         
         {/* Alert Component */}
         {alert && (

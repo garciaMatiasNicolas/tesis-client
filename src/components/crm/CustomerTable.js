@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { FaUser, FaBuilding, FaPlus, FaEdit, FaTrash, FaSearch, FaFilter, FaEye, FaEnvelope, FaPhone, FaMapMarkerAlt, FaSpinner, FaCalendarAlt, FaDollarSign, FaChevronDown, FaChevronRight, FaShoppingCart, FaComment, FaCommentDots, FaSave, FaTimes } from "react-icons/fa";
+import { FaUser, FaBuilding, FaPlus, FaEdit, FaTrash, FaSearch, FaEye, FaEnvelope, FaPhone, FaMapMarkerAlt, FaSpinner, FaCalendarAlt, FaDollarSign } from "react-icons/fa";
+import CustomerDetailModal from "./CustomerDetailModal";
 
 export default function CustomerTable({ 
     customers = [], 
@@ -8,12 +9,10 @@ export default function CustomerTable({
     error = null, 
     onDeleteCustomer,
     onCreateCustomer,
-    onUpdateCustomer,
     onEditCustomer,
     onAddContact,
     searchTerm = "",
     onSearchChange,
-    onFilterChange,
     showActions = true,
     stats = null
 }) {
@@ -22,23 +21,20 @@ export default function CustomerTable({
     const [selectedType, setSelectedType] = useState("Todos");
     const [countries, setCountries] = useState(["Todos"]);
     const [selectedCountry, setSelectedCountry] = useState("Todos");
-    const [expandedRows, setExpandedRows] = useState(new Set());
-    const [newComments, setNewComments] = useState({});
-    const [editingComment, setEditingComment] = useState(null);
-    const [loadingContacts, setLoadingContacts] = useState({});
-    const [contactHistories, setContactHistories] = useState({});
-    const [showContactForm, setShowContactForm] = useState({});
+    const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
     // Efecto para filtrar clientes
     useEffect(() => {
         // Asegurar que customers sea siempre un array
         const validCustomers = Array.isArray(customers) ? customers : [];
-        console.log('Clientes recibidos:', validCustomers);
-        
+       
         let filtered = validCustomers.filter(customer => {
-            const matchesSearch = (customer.first_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+            const matchesSearch = (customer.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                                 (customer.display_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                                 (customer.first_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                                  (customer.last_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                                 (customer.full_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                                 (customer.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                                  (customer.fantasy_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                                  (customer.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
                                  (customer.cuit?.toLowerCase() || '').includes(searchTerm.toLowerCase());
@@ -49,8 +45,8 @@ export default function CustomerTable({
             return matchesSearch && matchesType && matchesCountry;
         });
 
-        console.log('Clientes filtrados:', filtered);
         setFilteredCustomers(filtered);
+        console.log(customers)
     }, [customers, searchTerm, selectedType, selectedCountry]);
 
     // Efecto para obtener tipos y países únicos
@@ -86,11 +82,26 @@ export default function CustomerTable({
 
     // Obtener nombre completo del cliente
     const getCustomerDisplayName = (customer) => {
-        if (customer.display_name) return customer.display_name;
-        
-        if (customer.customer_type === 'person') {
-            return `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || 'Sin nombre';
+        // Primero intentar usar display_name si existe
+        if (customer.display_name && customer.display_name.trim()) {
+            return customer.display_name;
         }
+        
+        // Si no hay display_name, usar full_name
+        if (customer.full_name && customer.full_name.trim()) {
+            return customer.full_name;
+        }
+        
+        // Fallback para otros campos (por compatibilidad)
+        if (customer.customer_type === 'person') {
+            const firstName = customer.first_name || '';
+            const lastName = customer.last_name || '';
+            if (firstName || lastName) {
+                return `${firstName} ${lastName}`.trim();
+            }
+        }
+        
+        // Últimos fallbacks
         return customer.name || customer.fantasy_name || 'Sin nombre';
     };
 
@@ -106,90 +117,23 @@ export default function CustomerTable({
         }
     };
 
-    // Manejar expansión de filas
-    const toggleRowExpansion = (customerId) => {
-        const newExpandedRows = new Set(expandedRows);
-        if (newExpandedRows.has(customerId)) {
-            newExpandedRows.delete(customerId);
-        } else {
-            newExpandedRows.add(customerId);
-            // Cargar historial de contactos cuando se expande
-            loadContactHistory(customerId);
-        }
-        setExpandedRows(newExpandedRows);
+    // Abrir modal de detalles del cliente
+    const handleViewCustomerDetails = (customer) => {
+        setSelectedCustomer(customer);
+        setIsDetailModalOpen(true);
     };
 
-    // Cargar historial de contactos cuando se expande una fila
-    const loadContactHistory = async (customerId) => {
-        if (contactHistories[customerId] || loadingContacts[customerId]) {
-            return; // Ya se cargó o está cargando
-        }
-
-        try {
-            setLoadingContacts(prev => ({ ...prev, [customerId]: true }));
-            
-            // Aquí sería ideal tener una función en el servicio CRM para obtener el historial
-            // Por ahora, usamos los datos que ya vienen en el cliente o intentamos llamar directamente
-            const customer = customers.find(c => c.id === customerId);
-            if (customer && customer.contact_history) {
-                setContactHistories(prev => ({ 
-                    ...prev, 
-                    [customerId]: customer.contact_history
-                }));
-            }
-        } catch (error) {
-            console.error('Error loading contact history:', error);
-        } finally {
-            setLoadingContacts(prev => ({ ...prev, [customerId]: false }));
-        }
+    // Cerrar modal de detalles
+    const handleCloseDetailModal = () => {
+        setIsDetailModalOpen(false);
+        setSelectedCustomer(null);
     };
 
-    // Manejar agregar contacto
-    const handleAddContact = async (customerId) => {
-        const comment = newComments[customerId];
-        if (comment && comment.trim() && onAddContact) {
-            try {
-                const contactData = {
-                    comment: comment.trim(),
-                    contacted_by: null // Se establecerá en el backend
-                };
-                
-                await onAddContact(customerId, contactData);
-                
-                // Limpiar el comentario temporal
-                setNewComments({
-                    ...newComments,
-                    [customerId]: ''
-                });
-
-                // Recargar el historial de contactos
-                setContactHistories(prev => ({ ...prev, [customerId]: null }));
-                await loadContactHistory(customerId);
-                
-            } catch (error) {
-                console.error('Error adding contact:', error);
-                alert('Error al agregar el contacto. Por favor, intenta nuevamente.');
-            }
-        }
-    };
-
-    // Manejar mostrar/ocultar formulario de contacto
-    const toggleContactForm = (customerId) => {
-        setShowContactForm(prev => ({
-            ...prev,
-            [customerId]: !prev[customerId]
-        }));
-    };
-
-    // Manejar edición de comentario existente (placeholder para futura implementación)
-    const handleEditComment = (customerId, commentIndex, newText) => {
-        console.log('Editar contacto', commentIndex, 'del cliente', customerId, ':', newText);
-        setEditingComment(null);
-    };
-
-    // Cancelar edición de comentario
-    const cancelEditComment = () => {
-        setEditingComment(null);
+    // Callback cuando se agrega un contacto (para recargar datos si es necesario)
+    const handleContactAdded = () => {
+        // Aquí podrías recargar la lista de clientes si es necesario
+        // Por ahora solo cerramos y podríamos notificar al componente padre
+        console.log('Contact added successfully');
     };
 
     // Loading state
@@ -252,7 +196,7 @@ export default function CustomerTable({
                             <input
                                 type="text"
                                 placeholder="Buscar por nombre, email, CUIT..."
-                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent"
+                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent text-black"
                                 value={searchTerm}
                                 onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
                             />
@@ -262,7 +206,7 @@ export default function CustomerTable({
                     {/* Filtro de tipo */}
                     <div className="lg:w-48">
                         <select
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent text-black"
                             value={selectedType}
                             onChange={(e) => setSelectedType(e.target.value)}
                         >
@@ -279,7 +223,7 @@ export default function CustomerTable({
                     {/* Filtro de país */}
                     <div className="lg:w-48">
                         <select
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent text-black"
                             value={selectedCountry}
                             onChange={(e) => setSelectedCountry(e.target.value)}
                         >
@@ -329,9 +273,6 @@ export default function CustomerTable({
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                             <tr>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12">
-                                    
-                                </th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                     Cliente
                                 </th>
@@ -343,9 +284,6 @@ export default function CustomerTable({
                                 </th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                     Ubicación
-                                </th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                    Actividad
                                 </th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                     Total Gastado
@@ -360,24 +298,10 @@ export default function CustomerTable({
                         <tbody className="bg-white divide-y divide-gray-200">
                             {filteredCustomers.map((customer) => {
                                 const CustomerIcon = getCustomerIcon(customer.customer_type);
-                                const isExpanded = expandedRows.has(customer.id);
                                 
                                 return (
-                                    <React.Fragment key={customer.id}>
-                                        <tr className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <button
-                                                    onClick={() => toggleRowExpansion(customer.id)}
-                                                    className="text-gray-400 hover:text-[#18c29c] transition-colors p-1"
-                                                >
-                                                    {isExpanded ? (
-                                                        <FaChevronDown className="text-sm" />
-                                                    ) : (
-                                                        <FaChevronRight className="text-sm" />
-                                                    )}
-                                                </button>
-                                            </td>
-                                            <td className="px-6 py-4">
+                                    <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
+                                        <td className="px-6 py-4">
                                             <div className="flex items-start gap-3">
                                                 <div className="w-12 h-12 bg-gradient-to-br from-[#18c29c] to-[#15a884] rounded-lg flex items-center justify-center flex-shrink-0">
                                                     <CustomerIcon className="text-white text-lg" />
@@ -433,30 +357,14 @@ export default function CustomerTable({
                                             <div className="flex items-start gap-2">
                                                 <FaMapMarkerAlt className="text-gray-400 text-xs mt-1 flex-shrink-0" />
                                                 <div className="text-sm text-gray-900">
+                                                    {customer.address && (
+                                                        <p className="font-medium">{customer.address}</p>
+                                                    )}
                                                     <p>{customer.city || 'Sin ciudad'}</p>
                                                     <p className="text-xs text-gray-500">
                                                         {customer.state || 'Sin provincia'}, {customer.country || 'Sin país'}
                                                     </p>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="space-y-1">
-                                                {customer.last_date_contacted && (
-                                                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                                                        <FaCalendarAlt className="text-gray-400" />
-                                                        <span>Contactado: {formatDate(customer.last_date_contacted)}</span>
-                                                    </div>
-                                                )}
-                                                {customer.last_purchase_date && (
-                                                    <div className="flex items-center gap-2 text-xs text-gray-600">
-                                                        <FaCalendarAlt className="text-gray-400" />
-                                                        <span>Última compra: {formatDate(customer.last_purchase_date)}</span>
-                                                    </div>
-                                                )}
-                                                {!customer.last_date_contacted && !customer.last_purchase_date && (
-                                                    <span className="text-xs text-gray-400">Sin actividad</span>
-                                                )}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
@@ -470,7 +378,11 @@ export default function CustomerTable({
                                         {showActions && (
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-2">
-                                                    <button className="text-gray-400 hover:text-[#18c29c] transition-colors p-1">
+                                                    <button
+                                                        onClick={() => handleViewCustomerDetails(customer)}
+                                                        className="text-gray-400 hover:text-[#18c29c] transition-colors p-1"
+                                                        title="Ver detalles"
+                                                    >
                                                         <FaEye className="text-sm" />
                                                     </button>
                                                     <button
@@ -483,6 +395,7 @@ export default function CustomerTable({
                                                     <button 
                                                         onClick={() => handleDeleteCustomer(customer)}
                                                         className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                                                        title="Eliminar cliente"
                                                     >
                                                         <FaTrash className="text-sm" />
                                                     </button>
@@ -490,207 +403,6 @@ export default function CustomerTable({
                                             </td>
                                         )}
                                     </tr>
-                                    
-                                    {/* Fila expandida con detalles */}
-                                    {isExpanded && (
-                                        <tr>
-                                            <td colSpan={showActions ? 8 : 7} className="px-6 py-0">
-                                                <div className="bg-gray-50 -mx-6 px-6 py-6">
-                                                    <div className="grid md:grid-cols-2 gap-6">
-                                                        {/* Historial de compras */}
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-4">
-                                                                <FaShoppingCart className="text-[#18c29c]" />
-                                                                <h4 className="font-semibold text-gray-900">Historial de Compras</h4>
-                                                            </div>
-                                                            
-                                                            {customer.purchases && customer.purchases.length > 0 ? (
-                                                                <div className="space-y-3 max-h-64 overflow-y-auto">
-                                                                    {customer.purchases.map((purchase, index) => (
-                                                                        <div key={index} className="bg-white p-4 rounded-lg border border-gray-200">
-                                                                            <div className="flex justify-between items-start mb-2">
-                                                                                <div>
-                                                                                    <p className="font-medium text-gray-900">
-                                                                                        Orden #{purchase.order_number}
-                                                                                    </p>
-                                                                                    <p className="text-sm text-gray-600">
-                                                                                        {formatDate(purchase.date)}
-                                                                                    </p>
-                                                                                </div>
-                                                                                <div className="text-right">
-                                                                                    <p className="font-semibold text-gray-900">
-                                                                                        {formatCurrency(purchase.total)}
-                                                                                    </p>
-                                                                                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                                                                        purchase.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                                                                        purchase.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                        'bg-red-100 text-red-800'
-                                                                                    }`}>
-                                                                                        {purchase.status === 'completed' ? 'Completada' :
-                                                                                         purchase.status === 'pending' ? 'Pendiente' : 'Cancelada'}
-                                                                                    </span>
-                                                                                </div>
-                                                                            </div>
-                                                                            {purchase.items && (
-                                                                                <div className="text-sm text-gray-600">
-                                                                                    <p className="font-medium mb-1">Productos:</p>
-                                                                                    <ul className="space-y-1">
-                                                                                        {purchase.items.map((item, itemIndex) => (
-                                                                                            <li key={itemIndex} className="flex justify-between">
-                                                                                                <span>{item.product_name} x{item.quantity}</span>
-                                                                                                <span>{formatCurrency(item.price * item.quantity)}</span>
-                                                                                            </li>
-                                                                                        ))}
-                                                                                    </ul>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-center py-8 text-gray-500">
-                                                                    <FaShoppingCart className="mx-auto h-8 w-8 text-gray-300 mb-2" />
-                                                                    <p>No hay compras registradas</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        
-                                                        {/* Comentarios */}
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-4">
-                                                                <FaCommentDots className="text-[#18c29c]" />
-                                                                <h4 className="font-semibold text-gray-900">Comentarios</h4>
-                                                            </div>
-                                                            
-                                                            {/* Agregar nuevo comentario */}
-                                                            <div className="mb-4">
-                                                                <div className="flex gap-2">
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="Agregar comentario..."
-                                                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent text-sm"
-                                                                        value={newComments[customer.id] || ''}
-                                                                        onChange={(e) => setNewComments({
-                                                                            ...newComments,
-                                                                            [customer.id]: e.target.value
-                                                                        })}
-                                                                        onKeyPress={(e) => {
-                                                                            if (e.key === 'Enter') {
-                                                                                handleAddComment(customer.id);
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    <button
-                                                                        onClick={() => handleAddComment(customer.id)}
-                                                                        disabled={!newComments[customer.id]?.trim()}
-                                                                        className="px-3 py-2 bg-[#18c29c] text-white rounded-lg hover:bg-[#15a884] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                    >
-                                                                        <FaSave className="text-sm" />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            {/* Lista de contactos existentes */}
-                                                            {contactHistories[customer.id] && contactHistories[customer.id].length > 0 ? (
-                                                                <div className="space-y-3 max-h-64 overflow-y-auto">
-                                                                    {contactHistories[customer.id].map((contact, index) => (
-                                                                        <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
-                                                                            {editingComment === `${customer.id}-${index}` ? (
-                                                                                <div className="space-y-2">
-                                                                                    <textarea
-                                                                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent text-sm"
-                                                                                        rows="3"
-                                                                                        defaultValue={contact.comment}
-                                                                                        onKeyPress={(e) => {
-                                                                                            if (e.key === 'Enter' && e.ctrlKey) {
-                                                                                                handleEditComment(customer.id, index, e.target.value);
-                                                                                            }
-                                                                                        }}
-                                                                                    />
-                                                                                    <div className="flex gap-2">
-                                                                                        <button
-                                                                                            onClick={(e) => {
-                                                                                                const textarea = e.target.closest('.space-y-2').querySelector('textarea');
-                                                                                                handleEditComment(customer.id, index, textarea.value);
-                                                                                            }}
-                                                                                            className="px-2 py-1 bg-[#18c29c] text-white rounded text-xs hover:bg-[#15a884] transition-colors"
-                                                                                        >
-                                                                                            <FaSave className="text-xs" />
-                                                                                        </button>
-                                                                                        <button
-                                                                                            onClick={cancelEditComment}
-                                                                                            className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400 transition-colors"
-                                                                                        >
-                                                                                            <FaTimes className="text-xs" />
-                                                                                        </button>
-                                                                                    </div>
-                                                                                </div>
-                                                                            ) : (
-                                                                                <div>
-                                                                                    <div className="flex justify-between items-start mb-2">
-                                                                                        <div className="flex-1">
-                                                                                            <p className="text-sm text-gray-900">{contact.comment}</p>
-                                                                                        </div>
-                                                                                        <button
-                                                                                            onClick={() => setEditingComment(`${customer.id}-${index}`)}
-                                                                                            className="text-gray-400 hover:text-[#18c29c] transition-colors ml-2"
-                                                                                        >
-                                                                                            <FaEdit className="text-xs" />
-                                                                                        </button>
-                                                                                    </div>
-                                                                                    <div className="flex justify-between items-center text-xs text-gray-500">
-                                                                                        <span>Contactado: {formatDate(contact.date)}</span>
-                                                                                        <span>Por: {contact.contacted_by || 'Sistema'}</span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            ) : customer.contact_history && customer.contact_history.length > 0 ? (
-                                                                <div className="space-y-3 max-h-64 overflow-y-auto">
-                                                                    {customer.contact_history.map((contact, index) => (
-                                                                        <div key={index} className="bg-white p-3 rounded-lg border border-gray-200">
-                                                                            <div>
-                                                                                <div className="flex justify-between items-start mb-2">
-                                                                                    <div className="flex-1">
-                                                                                        <p className="text-sm text-gray-900">{contact.comment}</p>
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="flex justify-between items-center text-xs text-gray-500">
-                                                                                    <span>Contactado: {formatDate(contact.date)}</span>
-                                                                                    <span>Por: {contact.contacted_by || 'Sistema'}</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            ) : loadingContacts[customer.id] ? (
-                                                                <div className="text-center py-4 text-gray-500">
-                                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#18c29c] mx-auto"></div>
-                                                                    <p className="mt-2 text-sm">Cargando historial de contactos...</p>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-center py-8 text-gray-500">
-                                                                    <FaComment className="mx-auto h-8 w-8 text-gray-300 mb-2" />
-                                                                    <p>No hay contactos registrados</p>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {/* Comentario principal del cliente */}
-                                                            {customer.comments && (
-                                                                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                                                                    <h5 className="font-medium text-blue-900 mb-2">Comentario Principal:</h5>
-                                                                    <p className="text-sm text-blue-800">{customer.comments}</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    )}
-                                </React.Fragment>
                                 );
                             })}
                         </tbody>
@@ -702,7 +414,6 @@ export default function CustomerTable({
                     <div className="divide-y divide-gray-200">
                         {filteredCustomers.map((customer) => {
                             const CustomerIcon = getCustomerIcon(customer.customer_type);
-                            const isExpanded = expandedRows.has(customer.id);
                             
                             return (
                                 <div key={customer.id} className="p-4 hover:bg-gray-50 transition-colors">
@@ -729,38 +440,31 @@ export default function CustomerTable({
                                                         {customer.customer_type === 'person' ? 'Persona' : 'Empresa'}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => toggleRowExpansion(customer.id)}
-                                                        className="text-gray-400 hover:text-[#18c29c] transition-colors p-1"
-                                                    >
-                                                        {isExpanded ? (
-                                                            <FaChevronDown className="text-sm" />
-                                                        ) : (
-                                                            <FaChevronRight className="text-sm" />
-                                                        )}
-                                                    </button>
-                                                    {showActions && (
-                                                        <div className="flex items-center gap-2">
-                                                            <button className="text-gray-400 hover:text-[#18c29c] transition-colors p-1">
-                                                                <FaEye className="text-sm" />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => onEditCustomer && onEditCustomer(customer)}
-                                                                className="text-gray-400 hover:text-blue-600 transition-colors p-1"
-                                                                title="Editar cliente"
-                                                            >
-                                                                <FaEdit className="text-sm" />
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => handleDeleteCustomer(customer)}
-                                                                className="text-gray-400 hover:text-red-600 transition-colors p-1"
-                                                            >
-                                                                <FaTrash className="text-sm" />
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                {showActions && (
+                                                    <div className="flex items-center gap-2 ml-2">
+                                                        <button
+                                                            onClick={() => handleViewCustomerDetails(customer)}
+                                                            className="text-gray-400 hover:text-[#18c29c] transition-colors p-1"
+                                                            title="Ver detalles"
+                                                        >
+                                                            <FaEye className="text-sm" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => onEditCustomer && onEditCustomer(customer)}
+                                                            className="text-gray-400 hover:text-blue-600 transition-colors p-1"
+                                                            title="Editar cliente"
+                                                        >
+                                                            <FaEdit className="text-sm" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleDeleteCustomer(customer)}
+                                                            className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                                                            title="Eliminar cliente"
+                                                        >
+                                                            <FaTrash className="text-sm" />
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                             
                                             {/* Información de contacto */}
@@ -801,136 +505,6 @@ export default function CustomerTable({
                                                     </div>
                                                 )}
                                             </div>
-                                            
-                                            {/* Contenido expandido para móvil */}
-                                            {isExpanded && (
-                                                <div className="mt-4 pt-4 border-t border-gray-200">
-                                                    <div className="space-y-4">
-                                                        {/* Historial de compras móvil */}
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-3">
-                                                                <FaShoppingCart className="text-[#18c29c]" />
-                                                                <h4 className="font-semibold text-gray-900 text-sm">Compras</h4>
-                                                            </div>
-                                                            
-                                                            {customer.purchases && customer.purchases.length > 0 ? (
-                                                                <div className="space-y-2 max-h-40 overflow-y-auto">
-                                                                    {customer.purchases.slice(0, 3).map((purchase, index) => (
-                                                                        <div key={index} className="bg-gray-50 p-3 rounded-lg">
-                                                                            <div className="flex justify-between items-start mb-1">
-                                                                                <span className="text-xs font-medium text-gray-900">
-                                                                                    #{purchase.order_number}
-                                                                                </span>
-                                                                                <span className="text-xs font-semibold text-gray-900">
-                                                                                    {formatCurrency(purchase.total)}
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className="flex justify-between items-center">
-                                                                                <span className="text-xs text-gray-600">
-                                                                                    {formatDate(purchase.date)}
-                                                                                </span>
-                                                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                                                                                    purchase.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                                                                    purchase.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                                                    'bg-red-100 text-red-800'
-                                                                                }`}>
-                                                                                    {purchase.status === 'completed' ? 'OK' :
-                                                                                     purchase.status === 'pending' ? 'Pend.' : 'Canc.'}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                    {customer.purchases.length > 3 && (
-                                                                        <p className="text-xs text-gray-500 text-center">
-                                                                            Y {customer.purchases.length - 3} compras más...
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-center py-4 text-gray-500">
-                                                                    <FaShoppingCart className="mx-auto h-6 w-6 text-gray-300 mb-1" />
-                                                                    <p className="text-xs">Sin compras</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        
-                                                        {/* Comentarios móvil */}
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-3">
-                                                                <FaCommentDots className="text-[#18c29c]" />
-                                                                <h4 className="font-semibold text-gray-900 text-sm">Comentarios</h4>
-                                                            </div>
-                                                            
-                                                            {/* Input para nuevo comentario */}
-                                                            <div className="mb-3">
-                                                                <div className="flex gap-1">
-                                                                    <input
-                                                                        type="text"
-                                                                        placeholder="Nuevo comentario..."
-                                                                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-[#18c29c] focus:border-transparent"
-                                                                        value={newComments[customer.id] || ''}
-                                                                        onChange={(e) => setNewComments({
-                                                                            ...newComments,
-                                                                            [customer.id]: e.target.value
-                                                                        })}
-                                                                        onKeyPress={(e) => {
-                                                                            if (e.key === 'Enter') {
-                                                                                handleAddComment(customer.id);
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    <button
-                                                                        onClick={() => handleAddComment(customer.id)}
-                                                                        disabled={!newComments[customer.id]?.trim()}
-                                                                        className="px-2 py-1 bg-[#18c29c] text-white rounded text-xs hover:bg-[#15a884] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                                    >
-                                                                        <FaSave className="text-xs" />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            {/* Lista de contactos */}
-                                                            {(contactHistories[customer.id] || customer.contact_history) && 
-                                                             (contactHistories[customer.id] || customer.contact_history).length > 0 ? (
-                                                                <div className="space-y-2 max-h-32 overflow-y-auto">
-                                                                    {(contactHistories[customer.id] || customer.contact_history).slice(0, 2).map((contact, index) => (
-                                                                        <div key={index} className="bg-gray-50 p-2 rounded text-xs">
-                                                                            <p className="text-gray-900 mb-1">{contact.comment}</p>
-                                                                            <div className="flex justify-between text-xs text-gray-500">
-                                                                                <span>Contactado: {formatDate(contact.date)}</span>
-                                                                                <span>Por: {contact.contacted_by || 'Sistema'}</span>
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                    {(contactHistories[customer.id] || customer.contact_history).length > 2 && (
-                                                                        <p className="text-xs text-gray-500 text-center">
-                                                                            Y {(contactHistories[customer.id] || customer.contact_history).length - 2} contactos más...
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                            ) : loadingContacts[customer.id] ? (
-                                                                <div className="text-center py-4 text-gray-500">
-                                                                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#18c29c] mx-auto"></div>
-                                                                    <p className="mt-1 text-xs">Cargando contactos...</p>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-center py-4 text-gray-500">
-                                                                    <FaComment className="mx-auto h-6 w-6 text-gray-300 mb-1" />
-                                                                    <p className="text-xs">Sin contactos registrados</p>
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {/* Comentario principal */}
-                                                            {customer.comments && (
-                                                                <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
-                                                                    <p className="text-xs font-medium text-blue-900 mb-1">Comentario Principal:</p>
-                                                                    <p className="text-xs text-blue-800">{customer.comments}</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -961,6 +535,14 @@ export default function CustomerTable({
                     </div>
                 )}
             </div>
+
+            {/* Modal de detalles del cliente */}
+            <CustomerDetailModal
+                isOpen={isDetailModalOpen}
+                onClose={handleCloseDetailModal}
+                customer={selectedCustomer}
+                onContactAdded={handleContactAdded}
+            />
         </div>
     );
 }

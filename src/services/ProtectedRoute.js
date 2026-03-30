@@ -2,11 +2,13 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isAuthenticated } from "@/services/auth";
+import useApiMethods from "@/hooks/useApiMethods";
 
 export default function ProtectedRoute({ children }) {
     const router = useRouter();
     const [checking, setChecking] = useState(true);
     const [isAuthorized, setIsAuthorized] = useState(false);
+    const { getMethod } = useApiMethods();
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -15,6 +17,11 @@ export default function ProtectedRoute({ children }) {
                 if (!auth) {
                     router.replace("/login");
                 } else {
+                    const response = await getMethod('/auth/verify-client/', {}, true);
+                    if (response.is_client) {
+                        router.replace("/login");
+                        return;
+                    }
                     setIsAuthorized(true);
                     setChecking(false);
                 }

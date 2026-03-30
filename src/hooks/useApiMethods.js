@@ -7,7 +7,7 @@ import { useMemo } from "react";
 const useApiMethods = () => {
     const navigate = useRouter();
     
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL 
     const environment = process.env.NEXT_PUBLIC_ENVIRONMENT || "development";
 
     const hostname = useMemo(() => {
@@ -70,7 +70,10 @@ const useApiMethods = () => {
                     'Content-Type': isFile ? 'multipart/form-data' : 'application/json'
                 }
             }
-
+            console.log(environment)
+            console.log(hostname)
+            console.log(apiUrl)
+            console.log(`${environment === "development" ? "http" : "https"}://${hostname}.${apiUrl}${endpoint}`);
             const response = await axios.post(`${environment === "development" ? "http" : "https"}://${hostname}.${apiUrl}${endpoint}`, data, config);
             return isResponseFile ? response : response.data;
         } catch (error) {
@@ -131,7 +134,7 @@ const useApiMethods = () => {
         }
     };
 
-    const deleteMethod = async (endpoint, withHeaders = true) => {
+    const deleteMethod = async (endpoint, data = {}, withHeaders = true) => {
         try {
             let config = {};
 
@@ -145,8 +148,11 @@ const useApiMethods = () => {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
-                    }
+                    },
+                    data: data
                 };
+            } else {
+                config = { data: data };
             }
 
             const response = await axios.delete(`${environment === "development" ? "http" : "https"}://${hostname}.${apiUrl}${endpoint}`, config);
