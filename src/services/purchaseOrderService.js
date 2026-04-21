@@ -144,7 +144,7 @@ class PurchaseOrderService {
             delivery_date: formData.delivery_date,
             total_price: parseFloat(formData.total_price || 0),
             description: formData.description || '',
-            status: formData.status || 'pending',
+            status: formData.status || 'draft',
             was_payed: formData.was_payed || false,
             received: formData.received || false,
             received_date: formData.received_date || null,
@@ -232,11 +232,46 @@ class PurchaseOrderService {
      */
     getStatusLabel(status) {
         const statusMap = {
+            draft: 'Presupuesto',
             pending: 'Pendiente',
-            approved: 'Aprobado',
-            rejected: 'Rechazado'
+            completed: 'Completada',
+            cancelled: 'Cancelada'
         };
         return statusMap[status] || status;
+    }
+
+    /**
+     * Descargar PDF de una orden de compra
+     * @param {number} purchaseId - ID de la orden de compra
+     * @returns {Promise} Descarga del PDF
+     */
+    async downloadPDF(purchaseId) {
+        if (!this.apiMethods) throw new Error('PurchaseOrderService not initialized');
+        
+        try {
+            // Usar getMethod con isResponseFile=true para obtener el blob
+            const response = await this.apiMethods.getMethod(
+                `/billing/purchase-orders/${purchaseId}/download-pdf/`,
+                {},
+                true,
+                true // isResponseFile
+            );
+
+            // Crear blob desde la respuesta
+            const blob = new Blob([response.data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `orden_compra_${String(purchaseId).padStart(8, '0')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Error downloading PDF:', error);
+            throw error;
+        }
     }
 
     /**
@@ -249,19 +284,22 @@ class PurchaseOrderService {
             return {
                 total: 0,
                 total_amount: 0,
+                draft: 0,
                 pending: 0,
-                approved: 0,
-                rejected: 0,
-                buyed: 0,
+                completed: 0,
+                cancelled: 0,
+                payed: 0,
+                received: 0
             };
         }
 
         return {
             total: purchaseOrders.length,
             total_amount: purchaseOrders.reduce((sum, purchase) => sum + parseFloat(purchase.total_price || 0), 0),
+            draft: purchaseOrders.filter(purchase => purchase.status === 'draft').length,
             pending: purchaseOrders.filter(purchase => purchase.status === 'pending').length,
-            approved: purchaseOrders.filter(purchase => purchase.status === 'approved').length,
-            rejected: purchaseOrders.filter(purchase => purchase.status === 'rejected').length,
+            completed: purchaseOrders.filter(purchase => purchase.status === 'completed').length,
+            cancelled: purchaseOrders.filter(purchase => purchase.status === 'cancelled').length,
             payed: purchaseOrders.filter(purchase => purchase.was_payed).length,
             received: purchaseOrders.filter(purchase => purchase.received).length,
         };

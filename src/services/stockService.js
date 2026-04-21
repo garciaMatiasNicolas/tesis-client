@@ -2,7 +2,7 @@ import useApiMethods from '@/hooks/useApiMethods';
 
 // Service para manejar operaciones relacionadas con stock
 const useStockService = () => {
-    const { getMethod } = useApiMethods();
+    const { getMethod, postMethod } = useApiMethods();
 
     const stockService = {
         // Obtener todo el stock
@@ -99,6 +99,8 @@ const useStockService = () => {
                 if (filters.purchase) params.append('purchase', filters.purchase);
                 if (filters.date_from) params.append('date_from', filters.date_from);
                 if (filters.date_to) params.append('date_to', filters.date_to);
+                if (filters.page) params.append('page', filters.page);
+                if (filters.page_size) params.append('page_size', filters.page_size);
                 
                 const queryString = params.toString();
                 const url = queryString ? `/stock-movements/?${queryString}` : '/stock-movements/';
@@ -122,10 +124,10 @@ const useStockService = () => {
             }
         },
 
-        // Obtener movimientos por producto
+        // Obtener movimientos por producto de las ultima semana
         getMovementsByProduct: async (productId) => {
             try {
-                const response = await getMethod(`/stock-movements/by_product/?product_id=${productId}`);
+                const response = await getMethod(`/stock-movements/by_product/?product_id=${productId}&date_from=${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()}&date_to=${new Date().toISOString()}`);
                 return response;
             } catch (error) {
                 console.error('Error al obtener movimientos por producto:', error);
@@ -166,6 +168,17 @@ const useStockService = () => {
                 return response;
             } catch (error) {
                 console.error('Error al obtener movimientos pendientes:', error);
+                throw error;
+            }
+        },
+
+        // Crear movimiento interno de stock
+        createInternalMovement: async (movementData) => {
+            try {
+                const response = await postMethod('/stock-movements/', movementData);
+                return response;
+            } catch (error) {
+                console.error('Error al crear movimiento interno:', error);
                 throw error;
             }
         }

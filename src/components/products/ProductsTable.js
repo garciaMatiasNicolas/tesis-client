@@ -37,9 +37,6 @@ export default function ProductsTable({
                                 Precio
                             </th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                Stock
-                            </th>
-                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                 Proveedor
                             </th>
                             <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -93,14 +90,6 @@ export default function ProductsTable({
                                         <p className="text-xs text-gray-500">
                                             Costo: {formatPrice(product.cost_price || 0)}
                                         </p>
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                    <div className="flex flex-col gap-1">
-                                        <span className="text-sm font-medium text-gray-900">
-                                            {product.stock_total || 0} unidades
-                                        </span>
-                                        {getStockBadge(product.stock_total || 0)}
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">

@@ -164,7 +164,7 @@ const CheckoutPage = () => {
                         address: customerData.address || '',
                         city: customerData.city || '',
                         state: customerData.state || '',
-                        postalCode: customerData.zip_code || '',
+                        postalCode: customerData.postal_code || '',
                         notes: ''
                     });
                     
@@ -231,12 +231,12 @@ const CheckoutPage = () => {
     
     // Función para generar el mensaje de WhatsApp
     const generateWhatsAppMessage = () => {
-        let message = `¡Hola! Me gustaría hacer un pedido desde ${storeConfig?.name || 'su tienda'}:\n\n`;
+        let message = `¡Hola! Me gustaría hacer un pedido desde la tienda ${storeConfig?.name || 'su tienda'}:\n\n`;
         
         // Agregar productos
         message += "*Productos:*\n";
         cart.forEach(item => {
-            message += `- ${item.quantity}x ${item.name} - $${(item.price * item.quantity).toFixed(2)}\n`;
+            message += `- ${item.quantity}x ${item.description} - $${(item.price * item.quantity).toFixed(2)}\n`;
         });
         
         // Agregar total
@@ -293,8 +293,23 @@ const CheckoutPage = () => {
                 await createCustomer(customerData);
             } else {
                 // Si no hay usuario, crear usuario y perfil de cliente
-                const userResult = await createUserForCustomerAndLogIn(userData);
+                const customerDataForRegistration = {
+                    phone: formData.phone || '',
+                    address: formData.address || '',
+                    city: formData.city || '',
+                    state: formData.state || '',
+                    postal_code: formData.postalCode || '',
+                    country: 'Argentina'
+                };
+                
+                const userResult = await createUserForCustomerAndLogIn(userData, customerDataForRegistration);
                 setUser(userResult);
+                
+                // Si se vinculó con un cliente existente, mostrar mensaje informativo
+                if (userResult.linked_to_existing) {
+                    console.log('✅ Cuenta vinculada con historial previo:', userResult.message);
+                    // Podrías mostrar una notificación aquí si lo deseas
+                }
             }
 
             setShowUserCreateModal(false);
@@ -357,6 +372,15 @@ const CheckoutPage = () => {
             } else {
                 // Para tiendas con checkout completo, usar el backend
                 const result = await completeCheckout(formData, cart);
+                
+                // Enviar mensaje de WhatsApp con los detalles del pedido
+                if (storeConfig?.phone) {
+                    const whatsappNumber = storeConfig.phone.replace(/[^0-9]/g, '');
+                    const message = generateWhatsAppMessage();
+                    
+                    // Abrir WhatsApp en una nueva pestaña
+                    window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
+                }
                 
                 setOrderPlaced(true);
                 clearCart();

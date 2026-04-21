@@ -84,9 +84,9 @@ export function CartProvider({ children }) {
     };
 
     // Función para crear usuario, customer y procesar el checkout completo
-    const createUserForCustomerAndLogIn = async (userData) => {
+    const createUserForCustomerAndLogIn = async (userData, customerData = {}) => {
         try {
-            const result = await ecommerceService.createUserForCustomerAndLogIn(userData);
+            const result = await ecommerceService.createUserForCustomerAndLogIn(userData, customerData);
             return result;
         } catch (error) {
             console.error('Error al crear usuario:', error);

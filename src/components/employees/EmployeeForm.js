@@ -328,10 +328,7 @@ const EmployeeForm = ({
         }
 
         try {
-            //console.log("Submitting Employee Form with data:", formData);
-            console.log(employee?.store);
-            console.log(currentUser?.employee_info?.store);
-            //await onSubmit(formData);
+            await onSubmit(formData);
         } catch (error) {
             console.error("Error en EmployeeForm:", error);
             

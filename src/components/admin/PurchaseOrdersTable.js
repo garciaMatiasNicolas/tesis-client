@@ -12,7 +12,8 @@ import {
     FaClock,
     FaCheckCircle,
     FaTimesCircle,
-    FaBox
+    FaBox,
+    FaFilePdf
 } from 'react-icons/fa';
 import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
 import PurchaseDetailModal from './PurchaseDetailModal';
@@ -28,6 +29,7 @@ export default function PurchaseOrdersTable({
     onUpdateStatus,
     onUpdatePayment,
     onUpdateReceived,
+    onDownloadPDF,
     searchTerm = "",
     onSearchChange,
     showActions = true,
@@ -46,24 +48,29 @@ export default function PurchaseOrdersTable({
     // Obtener badge de estado
     const getStatusBadge = (status) => {
         const badges = {
+            'draft': {
+                label: 'Presupuesto',
+                color: 'bg-gray-100 text-gray-800',
+                icon: <FaFileInvoice className="inline mr-1" />
+            },
             'pending': {
                 label: 'Pendiente',
                 color: 'bg-yellow-100 text-yellow-800',
                 icon: <FaClock className="inline mr-1" />
             },
-            'approved': {
-                label: 'Aprobada',
+            'completed': {
+                label: 'Completada',
                 color: 'bg-green-100 text-green-800',
                 icon: <FaCheckCircle className="inline mr-1" />
             },
-            'rejected': {
-                label: 'Rechazada',
+            'cancelled': {
+                label: 'Cancelada',
                 color: 'bg-red-100 text-red-800',
                 icon: <FaTimesCircle className="inline mr-1" />
             }
         };
         
-        const badge = badges[status] || badges['pending'];
+        const badge = badges[status] || badges['draft'];
         return (
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.color}`}>
                 {badge.icon}
@@ -166,12 +173,24 @@ export default function PurchaseOrdersTable({
 
             {/* Estadísticas */}
             {stats && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-sm text-gray-600">Total</p>
                                 <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                            </div>
+                            <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                                <FaFileInvoice className="text-gray-600 text-xl" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm text-gray-600">Presupuestos</p>
+                                <p className="text-2xl font-bold text-gray-600">{stats.draft || 0}</p>
                             </div>
                             <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
                                 <FaFileInvoice className="text-gray-600 text-xl" />
@@ -194,8 +213,8 @@ export default function PurchaseOrdersTable({
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-gray-600">Aprobadas</p>
-                                <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
+                                <p className="text-sm text-gray-600">Completadas</p>
+                                <p className="text-2xl font-bold text-green-600">{stats.completed || 0}</p>
                             </div>
                             <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                                 <FaCheckCircle className="text-green-600 text-xl" />
@@ -206,23 +225,11 @@ export default function PurchaseOrdersTable({
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm text-gray-600">Rechazadas</p>
-                                <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+                                <p className="text-sm text-gray-600">Canceladas</p>
+                                <p className="text-2xl font-bold text-red-600">{stats.cancelled || 0}</p>
                             </div>
                             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
                                 <FaTimesCircle className="text-red-600 text-xl" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600">Monto Total</p>
-                                <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalAmount)}</p>
-                            </div>
-                            <div className="w-12 h-12 bg-[#18c29c]/10 rounded-full flex items-center justify-center">
-                                <span className="text-[#18c29c] text-xl font-bold">$</span>
                             </div>
                         </div>
                     </div>
@@ -252,9 +259,10 @@ export default function PurchaseOrdersTable({
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all duration-200 appearance-none bg-white text-black"
                         >
                             <option value="all">Todos los estados</option>
+                            <option value="draft">Presupuestos</option>
                             <option value="pending">Pendientes</option>
-                            <option value="approved">Aprobadas</option>
-                            <option value="rejected">Rechazadas</option>
+                            <option value="completed">Completadas</option>
+                            <option value="cancelled">Canceladas</option>
                         </select>
                     </div>
                 </div>
@@ -393,6 +401,13 @@ export default function PurchaseOrdersTable({
                                                         title="Ver detalles"
                                                     >
                                                         <FaEye className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onDownloadPDF && onDownloadPDF(order.id)}
+                                                        className="text-blue-600 hover:text-blue-900 mr-3 inline-flex items-center transition-colors duration-150"
+                                                        title="Descargar PDF"
+                                                    >
+                                                        <FaFilePdf className="h-4 w-4" />
                                                     </button>
                                                     <button
                                                         onClick={() => onEditPurchase(order)}

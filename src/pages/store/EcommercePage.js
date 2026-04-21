@@ -3,7 +3,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import ProductFilters from '../../components/store/ProductFilters';
 import ProductSort from '../../components/store/ProductSort';
 import ProductGrid from '../../components/store/ProductGrid';
-import ProductModal from '../../components/store/ProductModal';
 import ShoppingCart from '../../components/store/ShoppingCart';
 import useEcommerceService from '@/services/ecommerceService';
 import '../../themes/modeTransitions.css';
@@ -46,9 +45,7 @@ const EcommercePage = () => {
     const [sortBy, setSortBy] = useState('');
     const [sortOrder, setSortOrder] = useState('asc');
 
-    // Estados para modales y carrito
-    const [selectedProduct, setSelectedProduct] = useState(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    // Estados para carrito
     const [isCartOpen, setIsCartOpen] = useState(false);
 
     // Función para cargar las categorías, subcategorías y proveedores
@@ -167,11 +164,6 @@ const EcommercePage = () => {
         setSortBy(field);
         setSortOrder(order);
         setCurrentPage(1);
-    };
-
-    const handleViewDetails = (product) => {
-        setSelectedProduct(product);
-        setIsModalOpen(true);
     };
 
     // Si estamos verificando el estado de la tienda
@@ -298,7 +290,12 @@ const EcommercePage = () => {
                 <div className="lg:hidden mb-4">
                 <button
                     onClick={() => setIsCartOpen(true)} // Placeholder - puedes crear un modal de filtros
-                    className={`w-full ${isDarkMode ? 'bg-[#1e1e1e] border-[#9a334d50]' : 'bg-white border-[#9a334d40]'} backdrop-blur-sm rounded-lg p-4 border flex items-center justify-center text-[#9a334d] ${isDarkMode ? 'hover:bg-[#9a334d20]' : 'hover:bg-[#9a334d10]'} transition-colors`}
+                    className="w-full backdrop-blur-sm rounded-lg p-4 border flex items-center justify-center transition-colors"
+                    style={{
+                        backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card,
+                        borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main,
+                        color: theme.primary.main
+                    }}
                 >
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
@@ -322,7 +319,6 @@ const EcommercePage = () => {
                     loading={loading}
                     theme={theme}
                     onAddToCart={!storeConfig?.view_only ? addToCart : null}
-                    onViewDetails={handleViewDetails}
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={setCurrentPage}
@@ -332,17 +328,6 @@ const EcommercePage = () => {
             </div>
             </div>
         </main>
-
-        {/* Modal de detalles del producto */}
-        <ProductModal
-            product={selectedProduct}
-            isOpen={isModalOpen}
-            theme={theme}
-            onClose={() => setIsModalOpen(false)}
-            onAddToCart={!storeConfig?.view_only ? addToCart : null}
-            viewOnly={storeConfig?.view_only}
-            isDarkMode={isDarkMode}
-        />
 
         {/* Carrito de compras - Solo mostrar si no es view_only */}
         {!storeConfig?.view_only && (

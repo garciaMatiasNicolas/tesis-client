@@ -14,7 +14,8 @@ import {
     FaTimes,
     FaClock,
     FaSpinner,
-    FaFileInvoiceDollar
+    FaFileInvoiceDollar,
+    FaFilePdf
 } from "react-icons/fa";
 import CustomerDetailModal from "@/components/crm/CustomerDetailModal";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
@@ -29,6 +30,7 @@ export default function SalesTable({
     onCreateSale,
     onEditSale,
     onUpdateStatus,
+    onDownloadPDF,
     searchTerm = "",
     onSearchChange,
     showActions = true,
@@ -51,6 +53,15 @@ export default function SalesTable({
     const [isDeleting, setIsDeleting] = useState(false);
     const [showDetailModal, setShowDetailModal] = useState(false);
     const [selectedSale, setSelectedSale] = useState(null);
+
+    // Status mapping for display
+    const statusMap = {
+        draft: { label: "Presupuesto", color: "text-gray-600 bg-gray-100", icon: FaFileInvoiceDollar },
+        pending: { label: "Pendiente", color: "text-yellow-600 bg-yellow-100", icon: FaClock },
+        processing: { label: "En Preparación", color: "text-blue-600 bg-blue-100", icon: FaTruck },
+        completed: { label: "Completada", color: "text-green-600 bg-green-100", icon: FaCheck },
+        cancelled: { label: "Cancelada", color: "text-red-600 bg-red-100", icon: FaTimes }
+    };
 
     // Delivery status options
     const deliveryStatusOptions = ["Todos", "Entregado", "Pendiente"];
@@ -124,28 +135,6 @@ export default function SalesTable({
 
         setFilteredSales(filtered);
     }, [salesOrders, searchTerm, selectedDeliveryStatus, selectedChannel, sortBy, sortOrder]);
-
-    // Handle delivery status update
-    const handleDeliveryUpdate = async (saleId, wasDelivered) => {
-        if (onUpdateStatus) {
-            const updateData = { was_delivered: wasDelivered };
-            // Si se marca como entregado, agregar la fecha actual
-            if (wasDelivered) {
-                updateData.delivered_date = new Date().toISOString().split('T')[0];
-            } else {
-                // Si se desmarca, limpiar la fecha
-                updateData.delivered_date = null;
-            }
-            await onUpdateStatus(saleId, updateData);
-        }
-    };
-
-    // Handle payment status update
-    const handlePaymentUpdate = async (saleId, wasPayed) => {
-        if (onUpdateStatus) {
-            await onUpdateStatus(saleId, { was_payed: wasPayed });
-        }
-    };
 
     // Handle sort
     const handleSort = (field) => {
@@ -367,16 +356,13 @@ export default function SalesTable({
                                     Total
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Estado Entrega
-                                </th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Pago
+                                    Estado
                                 </th>
                                 <th 
                                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                                     onClick={() => handleSort('delivery_date')}
                                 >
-                                    Fecha pactada de Entrega
+                                    Fecha Entrega
                                 </th>
                                 <th 
                                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -394,6 +380,7 @@ export default function SalesTable({
                         <tbody className="bg-white divide-y divide-gray-200">
                             {filteredSales.map((sale) => {
                                 const ChannelIcon = channelMap[sale.sales_channel]?.icon || FaShoppingCart;
+                                const StatusIcon = statusMap[sale.status]?.icon || FaClock;
                                 
                                 return (
                                     <tr key={sale.id} className="hover:bg-gray-50">
@@ -424,36 +411,26 @@ export default function SalesTable({
                                             {formatPrice(sale.total_price, sale.currency)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div>
-                                                <button
-                                                    onClick={() => handleDeliveryUpdate(sale.id, !sale.was_delivered)}
-                                                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
-                                                        sale.was_delivered 
-                                                            ? 'text-green-800 bg-green-100 hover:bg-green-200' 
-                                                            : 'text-yellow-800 bg-yellow-100 hover:bg-yellow-200'
-                                                    }`}
-                                                >
-                                                    {sale.was_delivered ? <FaTruck /> : <FaClock />}
-                                                    {sale.was_delivered ? 'Entregado' : 'Pendiente'}
-                                                </button>
-                                                {sale.was_delivered && sale.delivered_date && (
-                                                    <div className="text-xs text-gray-500 mt-1">
-                                                        {formatDate(sale.delivered_date)}
-                                                    </div>
-                                                )}
+                                            <div className="space-y-1">
+                                                <div className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${statusMap[sale.status]?.color}`}>
+                                                    <StatusIcon />
+                                                    {statusMap[sale.status]?.label}
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    {sale.was_payed && (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full text-green-800 bg-green-50">
+                                                            <FaCheck className="text-xs" />
+                                                            Pagado
+                                                        </span>
+                                                    )}
+                                                    {sale.was_delivered && (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full text-blue-800 bg-blue-50">
+                                                            <FaTruck className="text-xs" />
+                                                            Entregado
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <button
-                                                onClick={() => handlePaymentUpdate(sale.id, !sale.was_payed)}
-                                                className={`px-2 py-1 text-xs font-medium rounded-full ${
-                                                    sale.was_payed 
-                                                        ? 'text-green-800 bg-green-100 hover:bg-green-200' 
-                                                        : 'text-red-800 bg-red-100 hover:bg-red-200'
-                                                }`}
-                                            >
-                                                {sale.was_payed ? 'Pagado' : 'Pendiente'}
-                                            </button>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                             {formatDate(sale.delivery_date)}
@@ -465,18 +442,25 @@ export default function SalesTable({
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <div className="flex items-center justify-end space-x-2">
                                                     <button
-                                                        onClick={() => onEditSale(sale)}
-                                                        className="text-blue-600 hover:text-blue-900"
-                                                        title="Editar orden"
-                                                    >
-                                                        <FaEdit />
-                                                    </button>
-                                                    <button
                                                         onClick={() => handleViewDetails(sale)}
                                                         className="text-green-600 hover:text-green-900"
                                                         title="Ver detalles"
                                                     >
                                                         <FaEye />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onDownloadPDF && onDownloadPDF(sale.id)}
+                                                        className="text-blue-600 hover:text-blue-900"
+                                                        title="Descargar PDF"
+                                                    >
+                                                        <FaFilePdf />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onEditSale(sale)}
+                                                        className="text-blue-600 hover:text-blue-900"
+                                                        title="Editar orden"
+                                                    >
+                                                        <FaEdit />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteClick(sale)}
@@ -628,6 +612,7 @@ export default function SalesTable({
                 isOpen={showDetailModal}
                 onClose={handleCloseDetailModal}
                 sale={selectedSale}
+                onUpdateStatus={onUpdateStatus}
             />
         </div>
     );

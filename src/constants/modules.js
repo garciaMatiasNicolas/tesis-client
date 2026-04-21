@@ -17,6 +17,7 @@ import {
   FaFolder,
   FaBoxOpen,
   FaCog,
+  FaArrowsAltH
 } from "react-icons/fa";
 
 export const getSidebarItems = (router) => [
@@ -35,20 +36,20 @@ export const getSidebarItems = (router) => [
     icon: <FaBoxes />,
     dropdown: [
       { label: "Productos", icon: <FaList />, onClick: () => router.push("/products") },
-      { label: "Categorías", icon: <FaFolder />, onClick: () => router.push("/categories") },
+      { label: "Movimientos", icon: <FaArrowsAltH />, onClick: () => router.push("/movements") },
       { label: "Stock", icon: <FaBoxOpen />, onClick: () => router.push("/stock") },
       { label: "Depósitos", icon: <FaWarehouse />, onClick: () => router.push("/warehouses") },
     ],
   },
   { label: "Proveedores", icon: <FaTruck />, onClick: () => router.push("/suppliers") },
   { label: "CRM", icon: <FaChartLine />, onClick: () => router.push("/crm") },
+  { label: "Categorías", icon: <FaFolder />, onClick: () => router.push("/categories") },
   {
     label: "Administración",
     icon: <FaTools />,
     dropdown: [
       { label: "Ventas", icon: <FaHandshake />, onClick: () => router.push("/admin/sales") },
-      { label: "Compras", icon: <FaPlus />, onClick: () => router.push("/admin/purchase") },
-      { label: "Estadísticas", icon: <FaChartLine />, onClick: () => router.push("")  }
+      { label: "Compras", icon: <FaPlus />, onClick: () => router.push("/admin/purchase") }
     ],
   },
   { label: "Facturación", icon: <FaFileInvoiceDollar />, onClick: () => router.push("/billing") },

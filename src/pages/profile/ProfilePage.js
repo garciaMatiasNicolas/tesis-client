@@ -144,8 +144,23 @@ export default function ProfilePage() {
     const handleUpdateStore = async (formData) => {
         setSaving(true);
         try {
+            // Verificar si hay un logo para subir
+            const hasFile = formData.logo instanceof File;
+            let dataToSend = formData;
+
+            // Si hay un archivo, convertir a FormData
+            if (hasFile) {
+                const form = new FormData();
+                Object.keys(formData).forEach(key => {
+                    if (formData[key] !== null && formData[key] !== undefined) {
+                        form.append(key, formData[key]);
+                    }
+                });
+                dataToSend = form;
+            }
+
             if (store?.id) {
-                await putMethod(`/stores/${store.id}/`, formData);
+                await putMethod(`/stores/${store.id}/`, dataToSend, true, hasFile);
                 setAlert({
                     show: true,
                     type: 'success',
@@ -154,7 +169,7 @@ export default function ProfilePage() {
                 });
                 fetchStore(); // Recargar datos
             } else {
-                const response = await postMethod("/stores/", formData);
+                const response = await postMethod("/stores/", dataToSend, true, hasFile);
                 setStore(response);
                 setAlert({
                     show: true,

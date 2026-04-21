@@ -219,6 +219,32 @@ const useProductService = () => {
                 console.error('Error al eliminar unidad de producto:', error);
                 throw error;
             }
+        },
+
+        // Subir imagen de producto
+        uploadProductImage: async (productId, imageFile, slot = 'image_1') => {
+            try {
+                const formData = new FormData();
+                formData.append('image', imageFile);
+                formData.append('slot', slot);
+                
+                const response = await postMethod(`/products/${productId}/upload_image/`, formData, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al subir imagen:', error);
+                throw error;
+            }
+        },
+
+        // Eliminar imagen de producto
+        deleteProductImage: async (productId, slot = 'image_1') => {
+            try {
+                const response = await deleteMethod(`/products/${productId}/delete_image/?slot=${slot}`);
+                return response;
+            } catch (error) {
+                console.error('Error al eliminar imagen:', error);
+                throw error;
+            }
         }
     };
 

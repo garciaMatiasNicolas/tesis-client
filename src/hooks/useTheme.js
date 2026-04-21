@@ -7,12 +7,14 @@ const ThemeContext = createContext();
 
 // Proveedor del contexto
 export function ThemeProvider({ children, initialThemeId = 'wine', initialDarkMode = false }) {
-    const themeProvider = useThemeProvider();
+    const themeProvider = useMemo(() => useThemeProvider(), []);
     const [themeId, setThemeId] = useState(initialThemeId);
     const [isDarkMode, setIsDarkMode] = useState(initialDarkMode);
-    const [theme, setTheme] = useState({});
     
-    // Inicializar el tema (memoizamos la dependencia)
+    // Inicializar el tema directamente con el valor correcto
+    const [theme, setTheme] = useState(() => themeProvider.getThemeByID(initialThemeId));
+    
+    // Actualizar el tema cuando cambie el themeId
     useEffect(() => {
         const selectedTheme = themeProvider.getThemeByID(themeId);
         setTheme(selectedTheme);

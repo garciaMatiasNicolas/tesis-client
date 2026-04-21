@@ -1,10 +1,10 @@
 import ProtectedRoute from "@/services/ProtectedRoute";
-const { default: DashboardPage } = require("@/pages/dashboard/DashboardPage")
+import StatsPage from "@/pages/stats/StatsPage";
 
 const Page = () => {
     return (
         <ProtectedRoute>
-            <DashboardPage />
+            <StatsPage />
         </ProtectedRoute>
     );
 };

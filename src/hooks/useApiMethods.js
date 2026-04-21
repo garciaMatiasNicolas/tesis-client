@@ -24,9 +24,11 @@ const useApiMethods = () => {
         }, 2500);
     };
 
-    const getMethod = async (endpoint, params = {}, withHeaders = true) => {
+    const getMethod = async (endpoint, params = {}, withHeaders = true, isResponseFile = false) => {
         try {
-            let config = {};
+            let config = {
+                responseType: isResponseFile ? 'blob' : 'json'
+            };
 
             if (withHeaders) {
                 let token = await isAuthenticated();
@@ -34,11 +36,9 @@ const useApiMethods = () => {
                     handleSessionExpiry();
                     return;
                 }
-                config = {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
+                config.headers = {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
                 };
             }
 
@@ -46,7 +46,7 @@ const useApiMethods = () => {
                 params,
                 ...config,
             });
-            return response.data;
+            return isResponseFile ? response : response.data;
         } catch (error) {
             console.error("GET request failed:", error);
             throw error;
@@ -56,7 +56,7 @@ const useApiMethods = () => {
     const postMethod = async (endpoint, data = {}, withHeaders = true, isFile = false, isResponseFile = false) => {
         try {
             let config = {
-                isResponseFile: isFile ? 'blob' : 'json' 
+                responseType: isResponseFile ? 'blob' : 'json' 
             };
 
             if (withHeaders) {
@@ -70,10 +70,7 @@ const useApiMethods = () => {
                     'Content-Type': isFile ? 'multipart/form-data' : 'application/json'
                 }
             }
-            console.log(environment)
-            console.log(hostname)
-            console.log(apiUrl)
-            console.log(`${environment === "development" ? "http" : "https"}://${hostname}.${apiUrl}${endpoint}`);
+            
             const response = await axios.post(`${environment === "development" ? "http" : "https"}://${hostname}.${apiUrl}${endpoint}`, data, config);
             return isResponseFile ? response : response.data;
         } catch (error) {
@@ -82,7 +79,7 @@ const useApiMethods = () => {
         }
     };
 
-    const putMethod = async (endpoint, data = {}, withHeaders = true) => {
+    const putMethod = async (endpoint, data = {}, withHeaders = true, isFile = false) => {
         try {
             let config = {};
 
@@ -95,7 +92,7 @@ const useApiMethods = () => {
                 config = {
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': isFile ? 'multipart/form-data' : 'application/json'
                     }
                 };
             }

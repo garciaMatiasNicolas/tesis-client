@@ -38,7 +38,7 @@ const ProductSort = ({ sortBy, sortOrder, onSortChange, isDarkMode, theme }) => 
                 <button
                     key={option.value}
                     onClick={() => handleSortChange(option.value)}
-                    style={isActive ? { background: isDarkMode ? theme.primary.gradient : {}, color: "#ffff" } : {color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}}
+                    style={isActive ? { background: theme.primary.gradient, color: "#ffff" } : {color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}}
                     className={`
                     flex items-center px-3 py-2 rounded-md text-sm font-medium transition-all duration-200
                     

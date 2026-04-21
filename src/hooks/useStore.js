@@ -11,21 +11,15 @@ const StoreContext = createContext();
 export function StoreProvider({ children }) {
     const ecommerceService = useEcommerceService();
     const { getConfigEcommerce } = ecommerceService;
-    const themeProvider = useThemeProvider();
+    const themeProvider = useRef(useThemeProvider()).current;
     const [storeConfig, setStoreConfig] = useState(null);
     const [storeActive, setStoreActive] = useState(null); // null = checking, true = active, false = inactive
     const [loading, setLoading] = useState(true);
     const [storeTheme, setStoreTheme] = useState({ themeId: 'wine', darkMode: false });
-    const [mappedTheme, setMappedTheme] = useState(null);
-    const configFetchedRef = useRef(false);
     
-    // Inicializar tema por defecto
-    useEffect(() => {
-        if (!mappedTheme) {
-            const defaultTheme = themeProvider.getThemeByID('wine');
-            setMappedTheme(defaultTheme);
-        }
-    }, [themeProvider, mappedTheme]);
+    // Inicializar tema por defecto directamente en el estado
+    const [mappedTheme, setMappedTheme] = useState(() => themeProvider.getThemeByID('wine'));
+    const configFetchedRef = useRef(false);
     
     useEffect(() => {
         // Solo hacemos la petición una vez
@@ -115,12 +109,37 @@ function ThemeSync({ children }) {
 export function StoreThemeProvider({ children }) {
     return (
         <StoreProvider>
-            <ThemeProvider initialThemeId="wine" initialDarkMode={false}>
-                <ThemeSync>
-                    {children}
-                </ThemeSync>
-            </ThemeProvider>
+            <StoreThemeProviderInner>
+                {children}
+            </StoreThemeProviderInner>
         </StoreProvider>
+    );
+}
+
+// Componente interno que espera a que se cargue la configuración de la tienda
+function StoreThemeProviderInner({ children }) {
+    const { storeTheme, loading, mappedTheme } = useStore();
+    
+    // Mostrar loading mientras se carga la configuración de la tienda
+    if (loading || !mappedTheme) {
+        return (
+            <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#1f1e1eff' }}>
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" 
+                         style={{ borderColor: '#9a334d' }}></div>
+                    <p style={{ color: '#e0e0e0' }}>Cargando tienda...</p>
+                </div>
+            </div>
+        );
+    }
+    
+    // Una vez cargada la configuración, inicializar ThemeProvider con los valores correctos
+    return (
+        <ThemeProvider initialThemeId={storeTheme.themeId} initialDarkMode={storeTheme.darkMode}>
+            <ThemeSync>
+                {children}
+            </ThemeSync>
+        </ThemeProvider>
     );
 }
 

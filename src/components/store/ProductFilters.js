@@ -84,10 +84,10 @@ const ProductFilters = ({
     return (
         <div className="w-80 rounded-lg shadow-lg border backdrop-blur-sm sticky top-4" style={{background: isDarkMode ? theme.background.dark.main : theme.background.light.main, borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}>
             {/* Header */}
-            <div className="p-4 border-b border-[#9a334d30]" style={{background: theme.primary.dark}}>
+            <div className="p-4 border-b" style={{background: theme.primary.dark, borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}>
                 <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-[#e0e0e0] flex items-center">
-                        <svg className="w-5 h-5 mr-2 text-[#ffff]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <h3 className="text-lg font-semibold flex items-center" style={{color: theme.text.dark.primary}}>
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{color: theme.text.dark.primary}}>
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
                         </svg>
                         Filtros
@@ -100,7 +100,8 @@ const ProductFilters = ({
                     {hasActiveFilters && (
                         <button
                             onClick={handleClearAll}
-                            className="text-sm text-[#e5a59f] hover:text-[#a33240] transition-colors font-medium"
+                            className="text-sm transition-colors font-medium"
+                            style={{color: isDarkMode ? theme.text.dark.accent : theme.text.light.accent}}
                         >
                             Limpiar
                         </button>
@@ -116,11 +117,12 @@ const ProductFilters = ({
                         placeholder="Buscar productos..."
                         value={filters.search}
                         onChange={(e) => handleSearchChange(e.target.value)}
-                        style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}
-                        className="w-full pl-10 pr-4 py-2 border text-[#e0e0e0] rounded-lg focus:ring-2 focus:ring-[#9a334d] focus:border-transparent transition-all placeholder-[#a0a0a0]"
+                        style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main, backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}}
+                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:border-transparent transition-all"
                     />
                     <svg 
-                        className="absolute left-3 top-2.5 w-4 h-4 text-[#a0a0a0]"
+                        className="absolute left-3 top-2.5 w-4 h-4"
+                        style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -136,11 +138,11 @@ const ProductFilters = ({
                     <h4 style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="text-sm font-medium mb-2">Filtros aplicados:</h4>
                     <div className="flex flex-wrap gap-1">
                         {filters.search && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-[#9a334d30] text-[#e6b899]">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs" style={{backgroundColor: isDarkMode ? theme.primary.light : theme.primary.light, color: isDarkMode ? theme.text.dark.accent : theme.text.light.accent}}>
                                 "{filters.search}"
                                 <button 
                                     onClick={() => handleSearchChange('')}
-                                    className="ml-1 hover:text-[#e5a59f]"
+                                    className="ml-1"
                                 >
                                     ×
                                 </button>
@@ -149,11 +151,39 @@ const ProductFilters = ({
                         {filters.categories.map(catId => {
                             const cat = categories.find(c => c.id.toString() === catId.toString());
                             return cat ? (
-                                <span key={catId} className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-[#7a2639] text-[#ffffff]">
+                                <span key={catId} className="inline-flex items-center px-2 py-1 rounded-full text-xs" style={{backgroundColor: theme.primary.dark, color: theme.text.dark.primary}}>
                                     {cat.name}
                                     <button 
                                         onClick={() => handleCheckboxChange('categories', catId)}
-                                        className="ml-1 hover:text-[#e5a59f]"
+                                        className="ml-1"
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+                            ) : null;
+                        })}
+                        {filters.subcategories.map(subId => {
+                            const sub = subcategories.find(s => s.id.toString() === subId.toString());
+                            return sub ? (
+                                <span key={subId} className="inline-flex items-center px-2 py-1 rounded-full text-xs" style={{backgroundColor: theme.secondary.dark, color: theme.text.dark.primary}}>
+                                    {sub.name}
+                                    <button 
+                                        onClick={() => handleCheckboxChange('subcategories', subId)}
+                                        className="ml-1"
+                                    >
+                                        ×
+                                    </button>
+                                </span>
+                            ) : null;
+                        })}
+                        {filters.suppliers.map(suppId => {
+                            const supp = suppliers.find(s => s.id.toString() === suppId.toString());
+                            return supp ? (
+                                <span key={suppId} className="inline-flex items-center px-2 py-1 rounded-full text-xs" style={{backgroundColor: theme.primary.main, color: theme.text.dark.primary}}>
+                                    {supp.name}
+                                    <button 
+                                        onClick={() => handleCheckboxChange('suppliers', suppId)}
+                                        className="ml-1"
                                     >
                                         ×
                                     </button>
@@ -174,9 +204,10 @@ const ProductFilters = ({
                     >
                         <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="font-medium">Categorías</span>
                         <svg 
-                            className={`w-4 h-4 text-[#a0a0a0] transform transition-transform ${
+                            className={`w-4 h-4 transform transition-transform ${
                                 expandedSections.categories ? 'rotate-180' : ''
                             }`}
+                            style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
                             fill="none" 
                             stroke="currentColor" 
                             viewBox="0 0 24 24"
@@ -192,7 +223,8 @@ const ProductFilters = ({
                                         type="checkbox"
                                         checked={filters.categories.includes(category.id.toString())}
                                         onChange={() => handleCheckboxChange('categories', category.id.toString())}
-                                        className="rounded border-[#9a334d50] focus:ring-[#9a334d] focus:ring-opacity-50 bg-[#252525]"
+                                        style={{backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}
+                                        className="rounded focus:ring-opacity-50"
                                     />
                                     <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="text-sm">{category.name}</span>
                                 </label>
@@ -210,9 +242,10 @@ const ProductFilters = ({
                     >
                         <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="font-medium">Subcategorías</span>
                         <svg 
-                            className={`w-4 h-4 text-[#a0a0a0] transform transition-transform ${
+                            className={`w-4 h-4 transform transition-transform ${
                                 expandedSections.subcategories ? 'rotate-180' : ''
                             }`}
+                            style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
                             fill="none" 
                             stroke="currentColor" 
                             viewBox="0 0 24 24"
@@ -228,7 +261,8 @@ const ProductFilters = ({
                                         type="checkbox"
                                         checked={filters.subcategories.includes(subcategory.id.toString())}
                                         onChange={() => handleCheckboxChange('subcategories', subcategory.id.toString())}
-                                        className="rounded border-[#9a334d50] text-[#9a334d] focus:ring-[#9a334d] focus:ring-opacity-50 bg-[#252525]"
+                                        style={{backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}
+                                        className="rounded focus:ring-opacity-50"
                                     />
                                     <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="text-sm">{subcategory.name}</span>
                                 </label>
@@ -246,9 +280,10 @@ const ProductFilters = ({
                     >
                         <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="font-medium">Precio</span>
                         <svg 
-                            className={`w-4 h-4 text-[#a0a0a0] transform transition-transform ${
+                            className={`w-4 h-4 transform transition-transform ${
                                 expandedSections.price ? 'rotate-180' : ''
                             }`}
+                            style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
                             fill="none" 
                             stroke="currentColor" 
                             viewBox="0 0 24 24"
@@ -267,8 +302,8 @@ const ProductFilters = ({
                                     step="0.01"
                                     value={filters.minPrice}
                                     onChange={(e) => handlePriceChange('minPrice', e.target.value)}
-                                    style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}
-                                    className="w-full px-3 py-2 border text-[#e0e0e0] rounded-md focus:ring-2 focus:ring-[#9a334d] focus:border-transparent placeholder-[#a0a0a0]"
+                                    style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main, backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}}
+                                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:border-transparent"
                                 />
                             </div>
                             <div>
@@ -280,8 +315,8 @@ const ProductFilters = ({
                                     step="0.01"
                                     value={filters.maxPrice}
                                     onChange={(e) => handlePriceChange('maxPrice', e.target.value)}
-                                    style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}
-                                    className="w-full px-3 py-2 border text-[#e0e0e0] rounded-md focus:ring-2 focus:ring-[#9a334d] focus:border-transparent placeholder-[#a0a0a0]"
+                                    style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main, backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}}
+                                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:border-transparent"
                                 />
                             </div>
                         </div>
@@ -297,9 +332,10 @@ const ProductFilters = ({
                     >
                         <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="font-medium">Proveedores</span>
                         <svg 
-                            className={`w-4 h-4 text-[#a0a0a0] transform transition-transform ${
+                            className={`w-4 h-4 transform transition-transform ${
                                 expandedSections.suppliers ? 'rotate-180' : ''
                             }`}
+                            style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
                             fill="none" 
                             stroke="currentColor" 
                             viewBox="0 0 24 24"
@@ -315,7 +351,8 @@ const ProductFilters = ({
                                         type="checkbox"
                                         checked={filters.suppliers.includes(supplier.id.toString())}
                                         onChange={() => handleCheckboxChange('suppliers', supplier.id.toString())}
-                                        className="rounded border-[#9a334d50] text-[#9a334d] focus:ring-[#9a334d] focus:ring-opacity-50 bg-[#252525]"
+                                        style={{backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}
+                                        className="rounded focus:ring-opacity-50"
                                     />
                                     <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="text-sm">{supplier.name}</span>
                                 </label>

@@ -1,11 +1,13 @@
 "use client";
 import React, { useRef, useState, useEffect } from "react";
-import { FaCamera, FaDollarSign, FaTag, FaWeight, FaRulerVertical, FaRulerHorizontal, FaCube, FaBoxes, FaSpinner } from "react-icons/fa";
+import { FaCamera, FaDollarSign, FaTag, FaWeight, FaRulerVertical, FaRulerHorizontal, FaCube, FaBoxes, FaSpinner, FaTimes } from "react-icons/fa";
 import useProductService from "@/services/productService";
 import Alert from "@/components/ui/Alert";
 
 export default function ProductForm({ product = null, isEditing = false, onProductCreated, onCancel }) {
-  const fileInputRef = useRef();
+  const fileInputRef1 = useRef();
+  const fileInputRef2 = useRef();
+  const fileInputRef3 = useRef();
   const productService = useProductService();
   
   // Form states
@@ -25,6 +27,20 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
     promotional_price: '',
     product_type: 'physical'
   });
+  
+  // Image states (3 images support)
+  const [selectedImage1, setSelectedImage1] = useState(null);
+  const [selectedImage2, setSelectedImage2] = useState(null);
+  const [selectedImage3, setSelectedImage3] = useState(null);
+  const [imagePreview1, setImagePreview1] = useState(null);
+  const [imagePreview2, setImagePreview2] = useState(null);
+  const [imagePreview3, setImagePreview3] = useState(null);
+  const [uploadingImage1, setUploadingImage1] = useState(false);
+  const [uploadingImage2, setUploadingImage2] = useState(false);
+  const [uploadingImage3, setUploadingImage3] = useState(false);
+  const [deletingImage1, setDeletingImage1] = useState(false);
+  const [deletingImage2, setDeletingImage2] = useState(false);
+  const [deletingImage3, setDeletingImage3] = useState(false);
   
   // Product units for conversion
   const [productUnits, setProductUnits] = useState([]);
@@ -186,6 +202,13 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
           setSelectedSubcategory(product.subcategory?.id || '');
           setSelectedSupplier(product.supplier || null);
           
+          // Cargar imágenes existentes si hay
+          if (product.image_1) setImagePreview1(product.image_1);
+          if (product.image_2) setImagePreview2(product.image_2);
+          if (product.image_3) setImagePreview3(product.image_3);
+          // Fallback a image si no hay image_1
+          if (!product.image_1 && product.image) setImagePreview1(product.image);
+          
           // Load product units if editing
           try {
             const units = await productService.getProductUnits(product.id);
@@ -240,7 +263,103 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
   const handleRemoveProductUnit = (unitId) => {
     setProductUnits(prev => prev.filter(u => u.id !== unitId));
   };
+  // Handle image selection for specific slot
+  const handleImageSelect = (e, slot) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validar tamaño (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showAlert('warning', 'Archivo muy grande', 'La imagen no puede ser mayor a 5MB');
+        return;
+      }
+      
+      // Validar tipo
+      if (!file.type.startsWith('image/')) {
+        showAlert('warning', 'Tipo de archivo inválido', 'Solo se permiten archivos de imagen (JPEG, PNG, GIF)');
+        return;
+      }
+      
+      // Set selected image based on slot
+      if (slot === 'image_1') setSelectedImage1(file);
+      else if (slot === 'image_2') setSelectedImage2(file);
+      else if (slot === 'image_3') setSelectedImage3(file);
+      
+      // Crear preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (slot === 'image_1') setImagePreview1(reader.result);
+        else if (slot === 'image_2') setImagePreview2(reader.result);
+        else if (slot === 'image_3') setImagePreview3(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
+  // Handle uploading image for specific slot
+  const handleUploadImage = async (productId, slot) => {
+    const selectedImage = slot === 'image_1' ? selectedImage1 : 
+                         slot === 'image_2' ? selectedImage2 : selectedImage3;
+    
+    if (!selectedImage) return;
+    
+    // Set loading state for specific slot
+    const setUploading = slot === 'image_1' ? setUploadingImage1 : 
+                        slot === 'image_2' ? setUploadingImage2 : setUploadingImage3;
+    
+    try {
+      setUploading(true);
+      const response = await productService.uploadProductImage(productId, selectedImage, slot);
+      showAlert('success', 'Imagen subida', `La imagen ${slot.replace('_', ' ')} ha sido subida exitosamente`);
+      return response;
+    } catch (error) {
+      console.error('Error al subir imagen:', error);
+      showAlert('danger', 'Error al subir imagen', 'No se pudo subir la imagen. Intenta nuevamente.');
+      throw error;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Handle removing image for specific slot
+  const handleRemoveImage = async (slot) => {
+    // Set deleting state for specific slot
+    const setDeleting = slot === 'image_1' ? setDeletingImage1 : 
+                       slot === 'image_2' ? setDeletingImage2 : setDeletingImage3;
+    
+    if (product && (product.image_1 || product.image_2 || product.image_3 || product.image)) {
+      try {
+        setDeleting(true);
+        await productService.deleteProductImage(product.id, slot);
+        
+        // Clear preview based on slot
+        if (slot === 'image_1') setImagePreview1(null);
+        else if (slot === 'image_2') setImagePreview2(null);
+        else if (slot === 'image_3') setImagePreview3(null);
+        
+        showAlert('success', 'Imagen eliminada', `La imagen ${slot.replace('_', ' ')} ha sido eliminada exitosamente`);
+      } catch (error) {
+        console.error('Error al eliminar imagen:', error);
+        showAlert('danger', 'Error', 'No se pudo eliminar la imagen');
+      } finally {
+        setDeleting(false);
+      }
+    } else {
+      // Clear local selection
+      if (slot === 'image_1') {
+        setSelectedImage1(null);
+        setImagePreview1(null);
+        if (fileInputRef1.current) fileInputRef1.current.value = '';
+      } else if (slot === 'image_2') {
+        setSelectedImage2(null);
+        setImagePreview2(null);
+        if (fileInputRef2.current) fileInputRef2.current.value = '';
+      } else if (slot === 'image_3') {
+        setSelectedImage3(null);
+        setImagePreview3(null);
+        if (fileInputRef3.current) fileInputRef3.current.value = '';
+      }
+    }
+  };
   // Handle editing a product unit
   const handleEditProductUnit = (unitId, field, value) => {
     setProductUnits(prev => prev.map(u => 
@@ -282,6 +401,23 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
         result = await productService.updateProduct(product.id, productData);
       } else {
         result = await productService.createProduct(productData);
+      }
+      
+      // Subir imágenes si se seleccionaron (secuencialmente para evitar race conditions)
+      if (result.id) {
+        try {
+          if (selectedImage1) {
+            await handleUploadImage(result.id, 'image_1');
+          }
+          if (selectedImage2) {
+            await handleUploadImage(result.id, 'image_2');
+          }
+          if (selectedImage3) {
+            await handleUploadImage(result.id, 'image_3');
+          }
+        } catch (imageError) {
+          console.error('Error al subir una o más imágenes, pero el producto fue creado/actualizado:', imageError);
+        }
       }
       
       // Gestionar Product Units después de crear/actualizar el producto
@@ -445,38 +581,215 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
             </div>
           </div>
 
-          {/* Photos */}
+          {/* Photos - 3 Image Slots */}
           <div className="mb-6">
-            <label className="block font-semibold mb-2 text-gray-800">Fotos</label>
-            <div className="flex flex-wrap gap-4">
-              {[1, 2, 3].map((idx) => (
-                <div
-                  key={idx}
-                  className="flex-1 min-w-[200px] border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center p-4 min-h-[120px] cursor-pointer hover:border-[#18c29c] transition"
-                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                >
-                  <FaCamera className="text-3xl text-gray-400 mb-2" />
-                  <span className="text-gray-700 text-sm text-center">
-                    {idx === 1
-                      ? "Sube la vista frontal"
-                      : idx === 2
-                      ? "Prueba diferentes ángulos"
-                      : "Muestra variantes"}
-                  </span>
-                  {idx === 1 && (
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      accept="image/*"
-                      multiple
+            <label className="block font-semibold mb-3 text-gray-800">Imágenes del producto (hasta 3)</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Imagen 1 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700">Imagen 1 (Principal)</label>
+                {imagePreview1 ? (
+                  <div className="relative w-full h-48 border-2 border-gray-300 rounded overflow-hidden">
+                    <img
+                      src={imagePreview1}
+                      alt="Preview 1"
+                      className="w-full h-full object-cover"
                     />
-                  )}
-                </div>
-              ))}
+                    {/* Loading overlay para eliminar */}
+                    {deletingImage1 && (
+                      <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                        <div className="text-center">
+                          <FaSpinner className="text-white text-4xl animate-spin mx-auto mb-2" />
+                          <p className="text-white text-sm">Eliminando...</p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Loading overlay para subir */}
+                    {uploadingImage1 && (
+                      <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                        <div className="text-center">
+                          <FaSpinner className="text-white text-4xl animate-spin mx-auto mb-2" />
+                          <p className="text-white text-sm">Subiendo...</p>
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage('image_1')}
+                      disabled={deletingImage1 || uploadingImage1}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    className="w-full h-48 border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center p-4 cursor-pointer hover:border-[#18c29c] transition"
+                    onClick={() => fileInputRef1.current && fileInputRef1.current.click()}
+                  >
+                    <FaCamera className="text-4xl text-gray-400 mb-2" />
+                    <span className="text-gray-700 text-xs text-center font-medium">
+                      Subir imagen
+                    </span>
+                  </div>
+                )}
+                {imagePreview1 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef1.current && fileInputRef1.current.click()}
+                    disabled={uploadingImage1 || deletingImage1}
+                    className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cambiar
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef1}
+                  type="file"
+                  className="hidden"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  onChange={(e) => handleImageSelect(e, 'image_1')}
+                />
+              </div>
+
+              {/* Imagen 2 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700">Imagen 2</label>
+                {imagePreview2 ? (
+                  <div className="relative w-full h-48 border-2 border-gray-300 rounded overflow-hidden">
+                    <img
+                      src={imagePreview2}
+                      alt="Preview 2"
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Loading overlay para eliminar */}
+                    {deletingImage2 && (
+                      <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                        <div className="text-center">
+                          <FaSpinner className="text-white text-4xl animate-spin mx-auto mb-2" />
+                          <p className="text-white text-sm">Eliminando...</p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Loading overlay para subir */}
+                    {uploadingImage2 && (
+                      <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                        <div className="text-center">
+                          <FaSpinner className="text-white text-4xl animate-spin mx-auto mb-2" />
+                          <p className="text-white text-sm">Subiendo...</p>
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage('image_2')}
+                      disabled={deletingImage2 || uploadingImage2}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    className="w-full h-48 border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center p-4 cursor-pointer hover:border-[#18c29c] transition"
+                    onClick={() => fileInputRef2.current && fileInputRef2.current.click()}
+                  >
+                    <FaCamera className="text-4xl text-gray-400 mb-2" />
+                    <span className="text-gray-700 text-xs text-center font-medium">
+                      Subir imagen
+                    </span>
+                  </div>
+                )}
+                {imagePreview2 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef2.current && fileInputRef2.current.click()}
+                    disabled={uploadingImage2 || deletingImage2}
+                    className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cambiar
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef2}
+                  type="file"
+                  className="hidden"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  onChange={(e) => handleImageSelect(e, 'image_2')}
+                />
+              </div>
+
+              {/* Imagen 3 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-gray-700">Imagen 3</label>
+                {imagePreview3 ? (
+                  <div className="relative w-full h-48 border-2 border-gray-300 rounded overflow-hidden">
+                    <img
+                      src={imagePreview3}
+                      alt="Preview 3"
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Loading overlay para eliminar */}
+                    {deletingImage3 && (
+                      <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                        <div className="text-center">
+                          <FaSpinner className="text-white text-4xl animate-spin mx-auto mb-2" />
+                          <p className="text-white text-sm">Eliminando...</p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Loading overlay para subir */}
+                    {uploadingImage3 && (
+                      <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                        <div className="text-center">
+                          <FaSpinner className="text-white text-4xl animate-spin mx-auto mb-2" />
+                          <p className="text-white text-sm">Subiendo...</p>
+                        </div>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage('image_3')}
+                      disabled={deletingImage3 || uploadingImage3}
+                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    className="w-full h-48 border-2 border-dashed border-gray-300 rounded flex flex-col items-center justify-center p-4 cursor-pointer hover:border-[#18c29c] transition"
+                    onClick={() => fileInputRef3.current && fileInputRef3.current.click()}
+                  >
+                    <FaCamera className="text-4xl text-gray-400 mb-2" />
+                    <span className="text-gray-700 text-xs text-center font-medium">
+                      Subir imagen
+                    </span>
+                  </div>
+                )}
+                {imagePreview3 && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef3.current && fileInputRef3.current.click()}
+                    disabled={uploadingImage3 || deletingImage3}
+                    className="px-3 py-1.5 bg-blue-500 text-white text-sm rounded hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cambiar
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef3}
+                  type="file"
+                  className="hidden"
+                  accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                  onChange={(e) => handleImageSelect(e, 'image_3')}
+                />
+              </div>
+              
             </div>
-            <div className="text-xs text-gray-700 mt-2">
-              Tamaño mínimo recomendado: <span className="text-[#18c29c]">1024px</span>
+            <div className="text-xs text-gray-700 mt-3">
+              Tamaño máximo: <span className="text-[#18c29c]">5MB</span> por imagen | Formatos aceptados: JPG, PNG, GIF, WebP
             </div>
           </div>
 
@@ -690,7 +1003,7 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
                 Unidades de Conversión
               </h3>
               <p className="text-sm text-gray-600 mb-4">
-                Define las diferentes unidades de empaque/venta y su factor de conversión respecto a la unidad base ({formData.base_unit_name}).
+                Define las diferentes unidades de empaque/venta y su factor de conversión respecto a la unidad base.
               </p>
 
               {/* Add New Unit Form */}

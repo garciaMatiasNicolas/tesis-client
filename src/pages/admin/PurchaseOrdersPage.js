@@ -371,53 +371,51 @@ const PurchaseOrdersPage = () => {
         }
     };
 
-    // Manejar actualización de estado
-    const handleUpdateStatus = async (purchaseId, status, comment) => {
+    // Manejar actualización de estado y otros campos
+    const handleUpdateStatus = async (purchaseId, updateData) => {
         try {
-            // Actualizar estado
-            await purchaseOrderService.patchPurchaseOrder(purchaseId, { status, comment });
+            // Actualizar con los datos proporcionados
+            await purchaseOrderService.patchPurchaseOrder(purchaseId, updateData);
             
             // Recargar lista
             await loadPurchaseOrders();
             
-            const statusLabels = {
-                'pending': 'Pendiente',
-                'approved': 'Aprobada',
-                'rejected': 'Rechazada'
-            };
-            showAlert(`Estado actualizado a: ${statusLabels[status]}`);
+            // Determinar mensaje según el tipo de actualización
+            if (updateData.status) {
+                const statusLabels = {
+                    'draft': 'Presupuesto',
+                    'pending': 'Pendiente',
+                    'processing': 'En Preparación',
+                    'completed': 'Completada',
+                    'cancelled': 'Cancelada'
+                };
+                showAlert(`Estado actualizado a: ${statusLabels[updateData.status] || updateData.status}`);
+            } else if (updateData.was_payed !== undefined) {
+                showAlert(updateData.was_payed ? 'Orden marcada como pagada' : 'Orden marcada como no pagada');
+            } else if (updateData.received !== undefined) {
+                showAlert(updateData.received ? 'Orden marcada como recibida' : 'Orden marcada como no recibida');
+            } else {
+                showAlert('Orden actualizada exitosamente');
+            }
         } catch (err) {
-            console.error('Error updating status:', err);
-            showAlert(getApiErrorMessage(err, 'Error al actualizar el estado'), 'danger');
+            console.error('Error updating purchase:', err);
+            showAlert(getApiErrorMessage(err, 'Error al actualizar la orden'), 'danger');
+            throw err; // Re-throw para que el modal pueda manejarlo
         }
     };
 
-    // Manejar actualización de pago
+    // Manejar actualización de pago (mantener por compatibilidad, pero usar handleUpdateStatus)
     const handleUpdatePayment = async (purchaseId, wasPayed, comment) => {
-        try {
-            await purchaseOrderService.patchPurchaseOrder(purchaseId, { was_payed: wasPayed, comment });
-            await loadPurchaseOrders();
-            showAlert(wasPayed ? 'Orden marcada como pagada' : 'Orden marcada como no pagada');
-        } catch (err) {
-            console.error('Error updating payment:', err);
-            showAlert(getApiErrorMessage(err, 'Error al actualizar el estado de pago'), 'danger');
-        }
+        return handleUpdateStatus(purchaseId, { was_payed: wasPayed, comment });
     };
 
-    // Manejar actualización de recepción
+    // Manejar actualización de recepción (mantener por compatibilidad, pero usar handleUpdateStatus)
     const handleUpdateReceived = async (purchaseId, received, receivedDate, comment) => {
-        try {
-            await purchaseOrderService.patchPurchaseOrder(purchaseId, { 
-                received: received,
-                received_date: receivedDate,
-                comment
-            });
-            await loadPurchaseOrders();
-            showAlert(received ? 'Orden marcada como recibida' : 'Orden marcada como no recibida');
-        } catch (err) {
-            console.error('Error updating received:', err);
-            showAlert(getApiErrorMessage(err, 'Error al actualizar el estado de recepción'), 'danger');
-        }
+        return handleUpdateStatus(purchaseId, { 
+            received: received,
+            received_date: receivedDate,
+            comment
+        });
     };
 
     // Manejar búsqueda
@@ -430,6 +428,17 @@ const PurchaseOrdersPage = () => {
         if (newPage >= 1 && newPage <= totalPages) {
             setCurrentPage(newPage);
             // loadPurchaseOrders se ejecutará automáticamente por el useEffect
+        }
+    };
+
+    // Manejar descarga de PDF
+    const handleDownloadPDF = async (purchaseId) => {
+        try {
+            await purchaseOrderService.downloadPDF(purchaseId);
+            showAlert('PDF descargado exitosamente');
+        } catch (err) {
+            console.error('Error downloading PDF:', err);
+            showAlert('Error al descargar el PDF', 'error');
         }
     };
 
@@ -462,6 +471,7 @@ const PurchaseOrdersPage = () => {
                     onUpdateStatus={handleUpdateStatus}
                     onUpdatePayment={handleUpdatePayment}
                     onUpdateReceived={handleUpdateReceived}
+                    onDownloadPDF={handleDownloadPDF}
                     searchTerm={searchTerm}
                     onSearchChange={handleSearchChange}
                     showActions={showActions}

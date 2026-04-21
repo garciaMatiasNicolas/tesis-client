@@ -1,25 +1,39 @@
+"use client";
 import React from 'react';
+import { useRouter } from 'next/navigation';
+import { formatPrice } from '@/utils/formatData';
 
-const ProductCard = ({ product, onAddToCart, onViewDetails, isDarkMode = true, theme }) => {
+const ProductCard = ({ product, onAddToCart, isDarkMode = true, theme }) => {
+    const router = useRouter();
+    const isOutOfStock = product.stock === false;
+    
+    // Obtener la primera imagen disponible
+    const productImage = product.images?.[0] || product.image_1 || product.image || null;
+
+    const handleViewDetails = () => {
+        router.push(`/store/product/${product.id}`);
+    };
+    
     return (
-        <div style={{backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card}} className="rounded-lg shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group h-full flex flex-col border border-[#9a334d30]">
+        <div style={{backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card}} className={`rounded-lg shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group h-full flex flex-col`}>
         {/* Imagen del producto */}
-        <div className="relative h-48 md:h-56 overflow-hidden" style={{backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card}}>
-            {product.image ? (
+        <div className="relative h-48 md:h-56 overflow-hidden bg-white" style={{backgroundColor: isDarkMode ? theme.background.dark.elevated : theme.background.light.elevated}}>
+            {productImage ? (
             <img
-                src={product.image}
+                src={productImage}
                 alt={product.description}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                className={`w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 ${isOutOfStock ? 'grayscale opacity-50' : ''}`}
                 onError={(e) => {
-                    console.error('Error al cargar imagen:', product.image);
+                    console.error('Error al cargar imagen:', productImage);
                     e.target.onerror = null;
                     e.target.src = 'https://via.placeholder.com/300x200?text=Imagen+no+disponible';
                 }}
             />
             ) : (
-            <div className="w-full h-full flex items-center justify-center bg-[#252525]">
+            <div className={`w-full h-full flex items-center justify-center ${isOutOfStock ? 'grayscale opacity-50' : ''}`} style={{backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card}}>
                 <svg
-                className="w-16 h-16 text-[#a0a0a0]"
+                className="w-16 h-16"
+                style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -33,24 +47,34 @@ const ProductCard = ({ product, onAddToCart, onViewDetails, isDarkMode = true, t
                 </svg>
             </div>
             )}
-            {/* Badge de categoría */}
-            {product.category && (
+            
+            {/* Badge de categoría - arriba a la izquierda */}
+            {product.category && !isOutOfStock && (
             <div className="absolute top-2 left-2">
                 <span style={{ background: theme.primary.gradient }} className="text-white text-xs px-2 py-1 rounded-full shadow-lg">
                 {product.category.name}
                 </span>
             </div>
             )}
+            
+            {/* Badge de Sin Stock - pequeño, abajo a la derecha */}
+            {isOutOfStock && (
+                <div className="absolute bottom-2 right-2">
+                    <span className="bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded shadow-lg">
+                        Sin Stock
+                    </span>
+                </div>
+            )}
         </div>
 
         {/* Contenido del producto - flex-grow para empujar botones al final */}
         <div className="p-4 flex flex-col flex-grow">
             {/* SKU */}
-            <p className="text-xs text-[#a0a0a0] mb-1">SKU: {product.sku}</p>
+            <p className="text-xs mb-1" style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}>SKU: {product.sku}</p>
             
             {/* Descripción */}
-            <h3 style={{color: isDarkMode ? "#FFFF" : "black"}} className="font-semibold mb-2 line-clamp-2 hover:text-[#9a334d] cursor-pointer transition-colors duration-200"
-                onClick={() => onViewDetails(product)}>
+            <h3 style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="font-semibold mb-2 line-clamp-2 cursor-pointer transition-colors duration-200"
+                onClick={handleViewDetails}>
             {product.description}
             </h3>
 
@@ -61,7 +85,7 @@ const ProductCard = ({ product, onAddToCart, onViewDetails, isDarkMode = true, t
 
             {/* Proveedor */}
             {product.supplier && (
-            <p className="text-xs text-[#a0a0a0] mb-3">
+            <p className="text-xs mb-3" style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}>
                 Proveedor: {product.supplier.name}
             </p>
             )}
@@ -69,8 +93,8 @@ const ProductCard = ({ product, onAddToCart, onViewDetails, isDarkMode = true, t
             {/* Precio */}
             <div className="flex items-center justify-between mb-4 flex-grow">
             <div>
-                <span style={{color: isDarkMode ? "#ffff" : theme.text.light.accent}} className="text-2xl font-bold">
-                ${product.price}
+                <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.accent}} className="text-2xl font-bold">
+                {formatPrice(product.price)}
                 </span>
             </div>
             </div>
@@ -78,14 +102,19 @@ const ProductCard = ({ product, onAddToCart, onViewDetails, isDarkMode = true, t
             {/* Botones de acción - siempre al final */}
             <div className="flex gap-2 mt-auto">
             <button
-                onClick={() => onAddToCart(product)}
-                style={{ background: theme.primary.gradient, cursor: "pointer" }}
-                className="flex-1 text-white py-2 px-4 rounded-md transition-all duration-200 text-sm font-medium transform hover:scale-105 hover:shadow-lg shadow-[#9a334d50]"
+                onClick={() => !isOutOfStock && onAddToCart(product)}
+                disabled={isOutOfStock}
+                style={{ 
+                    background: isOutOfStock ? '#6b7280' : theme.primary.gradient, 
+                    cursor: isOutOfStock ? "not-allowed" : "pointer",
+                    opacity: isOutOfStock ? 0.6 : 1
+                }}
+                className="flex-1 text-white py-2 px-4 rounded-md transition-all duration-200 text-sm font-medium transform hover:scale-105 hover:shadow-lg shadow disabled:hover:scale-100 disabled:hover:shadow-none"
             >
-                Agregar al Carrito
+                {isOutOfStock ? 'Sin Stock' : 'Agregar +'}
             </button>
             <button
-                onClick={() => onViewDetails(product)}
+                onClick={handleViewDetails}
                 style={{ background: theme.primary.gradient, cursor: "pointer" }}
                 className="px-3 py-2 rounded-md transition-colors duration-200 "
             >

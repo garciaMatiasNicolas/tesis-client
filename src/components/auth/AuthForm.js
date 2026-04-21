@@ -7,6 +7,8 @@ export default function AuthForm({
     showOtp = false,
     onOtpSubmit,
     otpLength = 6,
+    storeLogo = null,
+    storeName = null,
 }) {
     const [form, setForm] = useState({
         email: "",
@@ -71,8 +73,17 @@ export default function AuthForm({
         >
             {!showOtp && 
                 <div className="text-center mb-6">
+                    {storeLogo && (
+                        <div className="flex justify-center mb-4">
+                            <img 
+                                src={storeLogo} 
+                                alt={storeName || "Logo"} 
+                                className="h-20 w-20 object-contain rounded-lg"
+                            />
+                        </div>
+                    )}
                     <h2 className="text-2xl font-bold mb-1 text-[#223263]">
-                        Bienvenido de vuelta
+                        {storeName || "Bienvenido de vuelta"}
                     </h2>
                     <p className="text-gray-500 text-sm">
                         Inicia sesión para continuar 

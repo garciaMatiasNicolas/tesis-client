@@ -5,22 +5,40 @@ import { FaUserCircle, FaHeadset, FaSignOutAlt, FaBars, FaTimes } from "react-ic
 import { getSidebarItems } from "@/constants/modules";
 import { useRouter } from "next/navigation";
 import { removeAuthToken } from "@/services/auth";
+import useApiMethods from "@/hooks/useApiMethods";
 
 export default function SideBar({ user, onSupport }) {
     const [openDropdown, setOpenDropdown] = useState(null);
     const [expanded, setExpanded] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [storeConfig, setStoreConfig] = useState(null);
 
     // En el futuro, filtra sidebarItems según permisos del usuario
     const router = useRouter();
     const items = getSidebarItems(router);
+    const { getMethod } = useApiMethods();
 
     const onLogout = () => {
         localStorage.clear();
         removeAuthToken();
         router.push("/login");
     };
+
+    // Obtener configuración de la tienda
+    useEffect(() => {
+        const fetchStoreConfig = async () => {
+            try {
+                const response = await getMethod('/stores/');
+                if (response && response.length > 0) {
+                    setStoreConfig(response[0]);
+                }
+            } catch (error) {
+                console.error('Error al obtener configuración de la tienda:', error);
+            }
+        };
+        fetchStoreConfig();
+    }, []);
 
     // Detectar si es móvil
     useEffect(() => {
@@ -52,7 +70,14 @@ export default function SideBar({ user, onSupport }) {
                 {/* Mobile Navbar */}
                 <nav className="fixed top-0 left-0 right-0 bg-white shadow-lg z-50 px-4 py-3 flex items-center justify-between md:hidden">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-xl font-bold text-[#223263]">Upzet</h1>
+                        {storeConfig?.logo && (
+                            <img 
+                                src={storeConfig.logo} 
+                                alt={storeConfig.name || "Logo"} 
+                                className="h-8 w-8 object-contain rounded-lg"
+                            />
+                        )}
+                        <h1 className="text-xl font-bold text-[#223263]">{storeConfig?.name || "Upzet"}</h1>
                     </div>
                     
                     <button
@@ -209,6 +234,25 @@ export default function SideBar({ user, onSupport }) {
             onMouseEnter={() => setExpanded(true)}
             onMouseLeave={() => setExpanded(false)}
         >
+            {/* Logo de la tienda */}
+            <div className="px-2 py-4 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                    {storeConfig?.logo && (
+                        <img 
+                            src={storeConfig.logo} 
+                            alt={storeConfig.name || "Logo"} 
+                            className="h-10 w-10 object-contain rounded-lg flex-shrink-0"
+                        />
+                    )}
+                    <h1 
+                        className={`text-lg font-bold text-[#223263] transition-all duration-300 ${
+                            expanded ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
+                        }`}
+                    >
+                        {storeConfig?.name || "Upzet"}
+                    </h1>
+                </div>
+            </div>
             <nav className="flex-1 px-2 py-8">
                 <ul className="space-y-2">
                     {items.map((item, idx) => (

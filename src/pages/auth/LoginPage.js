@@ -1,14 +1,16 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AuthForm from "@/components/auth/AuthForm";
 import Enable2FA from "@/components/auth/Enable2FA";
 import useApiMethods from "@/hooks/useApiMethods";
 import Alert from "@/components/ui/Alert";
 import { setAuthTokenIntoCookie } from "@/services/auth";
 import { useRouter } from "next/navigation";
+import useEcommerceService from "@/services/ecommerceService";
 
 const LoginPage = () => {
     const { postMethod } = useApiMethods();
+    const { getConfigEcommerce } = useEcommerceService();
     const [showOtp, setShowOtp] = useState(false);
     const [showEnable2FA, setShowEnable2FA] = useState(false);
     const [qrData, setQrData] = useState(null);
@@ -19,7 +21,21 @@ const LoginPage = () => {
     const [alertType, setAlertType] = useState("");
     const [user, setUser] = useState(null); // Para almacenar el usuario si es necesario
     const [loading, setLoading] = useState(false);
+    const [storeConfig, setStoreConfig] = useState(null);
     const router = useRouter();
+
+    // Obtener configuración de la tienda al cargar el componente
+    useEffect(() => {
+        const fetchStoreConfig = async () => {
+            try {
+                const config = await getConfigEcommerce();
+                setStoreConfig(config);
+            } catch (error) {
+                console.error('Error al obtener configuración de la tienda:', error);
+            }
+        };
+        fetchStoreConfig();
+    }, []);
 
     const handleLogin = async (data) => {
         setLoading(true);
@@ -28,6 +44,17 @@ const LoginPage = () => {
             const response = await postMethod("/auth/login/", data, false);
             setEmail(response.user_email);
             setUser(response.user_name);
+            
+            // Validar que el rol no sea "client"
+            if (response.user_role === "client") {
+                setAlertMessage("Los clientes no tienen autorización para acceder al panel administrativo. Por favor, utilice la tienda en línea.");
+                setAlertTitle("Acceso Denegado");
+                setAlertType("danger");
+                setShowAlert(true);
+                setLoading(false);
+                return;
+            }
+            
             localStorage.setItem("user_role", response.user_role); 
             
             if (response.message === "2fa_required") {
@@ -46,8 +73,8 @@ const LoginPage = () => {
                 setAlertType("danger");
                 setShowAlert(true);
             } else if (err?.response?.data?.error === "not_authorized") {
-                setAlertMessage("Cliente no autorizado para ingresar al portal.");
-                setAlertTitle("Error");
+                setAlertMessage("Los clientes no tienen autorización para acceder al panel administrativo. Por favor, utilice la tienda en línea.");
+                setAlertTitle("Acceso Denegado");
                 setAlertType("danger");
                 setShowAlert(true);
             } else {
@@ -129,6 +156,8 @@ const LoginPage = () => {
                         loading={loading}
                         showOtp={showOtp}
                         onOtpSubmit={handleOtpSubmit}
+                        storeLogo={storeConfig?.logo}
+                        storeName={storeConfig?.name}
                     />
                 )}
             </div>

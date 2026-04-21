@@ -36,6 +36,7 @@ export default function PurchaseFormModal({
     // Estados para datos de API
     const [suppliers, setSuppliers] = useState([]);
     const [products, setProducts] = useState([]);
+    const [filteredProducts, setFilteredProducts] = useState([]); // Productos filtrados por proveedor
     const [warehouses, setWarehouses] = useState([]);
     const [branches, setBranches] = useState([]);
     const [loadingData, setLoadingData] = useState(true);
@@ -53,6 +54,20 @@ export default function PurchaseFormModal({
             loadInitialData();
         }
     }, [isOpen]);
+
+    // Filtrar productos cuando cambia el proveedor seleccionado
+    useEffect(() => {
+        if (formData.supplier) {
+            // Filtrar productos por proveedor
+            const filtered = products.filter(product => 
+                product.supplier === formData.supplier.id
+            );
+            setFilteredProducts(filtered);
+        } else {
+            // Si no hay proveedor seleccionado, mostrar todos los productos
+            setFilteredProducts(products);
+        }
+    }, [formData.supplier, products]);
 
     const loadInitialData = async () => {
         try {
@@ -365,7 +380,11 @@ export default function PurchaseFormModal({
                                     value={formData.supplier?.id || ''}
                                     onChange={(e) => {
                                         const supplier = suppliers.find(s => s.id === parseInt(e.target.value));
-                                        setFormData({ ...formData, supplier });
+                                        setFormData({ 
+                                            ...formData, 
+                                            supplier,
+                                            items: [] // Limpiar items al cambiar de proveedor
+                                        });
                                     }}
                                     disabled={loadingData}
                                     className={`w-full px-3 py-2 text-black border rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
@@ -660,11 +679,29 @@ export default function PurchaseFormModal({
                             <button
                                 type="button"
                                 onClick={addItem}
-                                className="ml-4 inline-flex items-center px-3 py-1 bg-[#18c29c] hover:bg-[#15a884] text-white text-sm rounded-lg transition-colors"
+                                disabled={!formData.supplier}
+                                className="ml-4 inline-flex items-center px-3 py-1 bg-[#18c29c] hover:bg-[#15a884] text-white text-sm rounded-lg transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                title={!formData.supplier ? 'Primero seleccione un proveedor' : ''}
                             >
                                 <FaPlus className="mr-1" /> Agregar Producto
                             </button>
                         </div>
+
+                        {!formData.supplier && (
+                            <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-sm text-yellow-800">
+                                    ⚠ Debe seleccionar un proveedor antes de agregar productos
+                                </p>
+                            </div>
+                        )}
+
+                        {formData.supplier && filteredProducts.length === 0 && (
+                            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-sm text-blue-800">
+                                    ℹ No hay productos asociados al proveedor seleccionado
+                                </p>
+                            </div>
+                        )}
 
                         {errors.items && (
                             <p className="text-red-500 text-sm mb-3 flex items-center gap-1">
@@ -696,13 +733,15 @@ export default function PurchaseFormModal({
                                                             const product = products.find(p => p.id === parseInt(e.target.value));
                                                             updateItem(index, 'product', product);
                                                         }}
-                                                        disabled={loadingData}
+                                                        disabled={loadingData || !formData.supplier}
                                                         className={`w-full text-black px-2 py-1.5 text-sm border rounded focus:ring-2 focus:ring-[#18c29c] ${
                                                             errors[`item_${index}_product`] ? 'border-red-500' : 'border-gray-300'
                                                         }`}
                                                     >
-                                                        <option value="">Seleccione...</option>
-                                                        {products.map(product => (
+                                                        <option value="">
+                                                            {!formData.supplier ? 'Primero seleccione un proveedor' : 'Seleccione...'}
+                                                        </option>
+                                                        {filteredProducts.map(product => (
                                                             <option key={product.id} value={product.id}>
                                                                 {product.description} (SKU - {product.sku})
                                                             </option>

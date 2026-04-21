@@ -131,6 +131,10 @@ const SalesPage = () => {
                 setStats(salesOrderService.calculateStats(updatedSales));
                 
                 showAlert('Orden de venta actualizada exitosamente');
+                
+                // Cerrar modal solo si fue exitoso
+                setShowModal(false);
+                setEditingSale(null);
             } else {
                 // Crear nueva orden
                 const newSale = await salesOrderService.createSalesOrder(saleData);
@@ -143,20 +147,16 @@ const SalesPage = () => {
                 setStats(salesOrderService.calculateStats(updatedSales));
                 
                 showAlert('Orden de venta creada exitosamente');
+                
+                // Cerrar modal solo si fue exitoso
+                setShowModal(false);
+                setEditingSale(null);
             }
-            
-            // Cerrar modal
-            setShowModal(false);
-            setEditingSale(null);
             
         } catch (err) {
             console.error('Error submitting sale:', err);
-            showAlert(
-                editingSale 
-                    ? 'Error al actualizar la orden de venta'
-                    : 'Error al crear la orden de venta',
-                'danger'
-            );
+            // Re-lanzar el error para que el formulario pueda manejarlo
+            // (especialmente para el modal de selección de origen de stock)
             throw err;
         } finally {
             setModalLoading(false);
@@ -209,16 +209,12 @@ const SalesPage = () => {
             // Recalcular estadísticas
             setStats(salesOrderService.calculateStats(updatedSales));
             
-            if (updateData.status) {
-                const statusLabel = salesOrderService.getStatusLabel(updateData.status);
-                showAlert(`Estado actualizado a: ${statusLabel}`);
-            }
-            if (updateData.was_payed !== undefined) {
-                showAlert(`Estado de pago actualizado: ${updateData.was_payed ? 'Pagado' : 'Pendiente'}`);
-            }
+            // Retornar la venta actualizada para que el modal sepa que fue exitoso
+            return updatedSale;
         } catch (err) {
             console.error('Error updating status:', err);
-            showAlert('Error al actualizar el estado', 'danger');
+            // Lanzar el error para que el modal lo maneje
+            throw err;
         }
     };
 
@@ -231,6 +227,17 @@ const SalesPage = () => {
     const handlePageChange = (newPage) => {
         if (newPage >= 1 && newPage <= totalPages) {
             setCurrentPage(newPage);
+        }
+    };
+
+    // Manejar descarga de PDF
+    const handleDownloadPDF = async (saleId) => {
+        try {
+            await salesOrderService.downloadPDF(saleId);
+            showAlert('PDF descargado exitosamente');
+        } catch (err) {
+            console.error('Error downloading PDF:', err);
+            showAlert('Error al descargar el PDF', 'danger');
         }
     };
 
@@ -261,6 +268,7 @@ const SalesPage = () => {
                     onCreateSale={handleCreateSale}
                     onEditSale={handleEditSale}
                     onUpdateStatus={handleUpdateStatus}
+                    onDownloadPDF={handleDownloadPDF}
                     searchTerm={searchTerm}
                     onSearchChange={handleSearchChange}
                     showActions={showActions}

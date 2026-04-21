@@ -25,6 +25,7 @@ import useApiMethods from "@/hooks/useApiMethods";
 import { formatPrice } from "@/utils/formatData";
 import Link from 'next/link';
 import georefService from '@/services/georefService';
+import Alert from '@/components/ui/Alert';
 
 export default function SalesFormModal({ 
     isOpen, 
@@ -56,6 +57,7 @@ export default function SalesFormModal({
         discount: '0',
         description: '',
         currency: 'ARS',
+        status: 'draft',
         was_payed: false,
         with_shipping: false,
         use_customer_address: false,
@@ -109,6 +111,7 @@ export default function SalesFormModal({
     const [dataLoaded, setDataLoaded] = useState(false);
     const [errors, setErrors] = useState({});
     const [productUnits, setProductUnits] = useState({});
+    const [alert, setAlert] = useState(null);
     const apiMethods = useApiMethods();
 
     // Inicializar servicios
@@ -116,30 +119,44 @@ export default function SalesFormModal({
 
     // Función para parsear el error de stock
     const parseStockError = (errorMessage) => {
+    
+        // 1. Extraer nombre del producto
         const productMatch = errorMessage.match(/para '([^']+)'/);
-        const requiredMatch = errorMessage.match(/requerido: ([\d.]+)/);
-        const availableMatch = errorMessage.match(/disponible: ([\d.]+)/);
-        const locationMatch = errorMessage.match(/en (Sucursal|Depósito) ([^(]+)/);
         
-        // Extraer ubicaciones disponibles
-        const branchMatches = [...errorMessage.matchAll(/Sucursal '([^']+)' \(ID: (\d+)\): ([\d.]+) unidades/g)];
-        const warehouseMatches = [...errorMessage.matchAll(/Depósito '([^']+)' \(ID: (\d+)\): ([\d.]+) unidades/g)];
+        // 2. Extraer cantidad requerida
+        const requiredMatch = errorMessage.match(/Requerido:\s*([\d.]+)/);
         
+        // 3. Extraer disponible en ubicación actual (usamos case-insensitive 'i')
+        const availableMatch = errorMessage.match(/Disponible:\s*([\d.]+)/i);
+        
+        // 4. Extraer la ubicación actual (lo que está entre "en" y "para")
+        const locationMatch = errorMessage.match(/insuficiente en (.*?)\s*para/);
+
+        // 5. Extraer stock en otras ubicaciones (Depósitos o Sucursales)
+        // El formato es: Nombre 'Nombre' (ID: X): Cantidad
+        const otherLocationsRegex = /(Depósito|Sucursal)\s+'([^']+)'\s*\(ID:\s*(\d+)\):\s*([\d.]+)/g;
+        const allMatches = [...errorMessage.matchAll(otherLocationsRegex)];
+
+        const branches = [];
+        const warehouses = [];
+
+        allMatches.forEach(match => {
+            const item = {
+                name: match[2],
+                id: parseInt(match[3]),
+                quantity: parseFloat(match[4])
+            };
+            if (match[1] === 'Sucursal') branches.push(item);
+            else warehouses.push(item);
+        });
+
         return {
             productName: productMatch ? productMatch[1] : 'Producto',
             required: requiredMatch ? parseFloat(requiredMatch[1]) : 0,
             available: availableMatch ? parseFloat(availableMatch[1]) : 0,
-            currentLocation: locationMatch ? `${locationMatch[1]} ${locationMatch[2].trim()}` : 'Ubicación actual',
-            branches: branchMatches.map(match => ({
-                name: match[1],
-                id: parseInt(match[2]),
-                quantity: parseFloat(match[3])
-            })),
-            warehouses: warehouseMatches.map(match => ({
-                name: match[1],
-                id: parseInt(match[2]),
-                quantity: parseFloat(match[3])
-            }))
+            currentLocation: locationMatch ? locationMatch[1].trim() : 'Ubicación actual',
+            branches,
+            warehouses
         };
     };
 
@@ -363,7 +380,6 @@ export default function SalesFormModal({
                 
                 setDataLoaded(true);
             } catch (error) {
-                console.error('Error loading data:', error);
             } finally {
                 setLoadingData(false);
             }
@@ -371,6 +387,13 @@ export default function SalesFormModal({
 
         loadData();
     }, [isOpen, dataLoaded]);
+
+    // Limpiar alert cuando se cierra el modal o se abre uno nuevo
+    useEffect(() => {
+        if (isOpen) {
+            setAlert(null);
+        }
+    }, [isOpen]);
 
     // Reset form when modal opens/closes or when editing different sale
     useEffect(() => {
@@ -413,7 +436,6 @@ export default function SalesFormModal({
                                 const units = await productService.getProductUnits(item.product);
                                 unitsMap[item.product] = units || [];
                             } catch (error) {
-                                console.error(`Error loading units for product ${item.product}:`, error);
                                 unitsMap[item.product] = [];
                             }
                         }
@@ -435,6 +457,7 @@ export default function SalesFormModal({
                     discount: salesOrder.discount?.toString() || '0',
                     description: salesOrder.description || '',
                     currency: salesOrder.currency || 'ARS',
+                    status: salesOrder.status || 'draft',
                     was_payed: salesOrder.was_payed || false,
                     with_shipping: salesOrder.transport || salesOrder.driver || salesOrder.patent ? true : false,
                     use_customer_address: false,
@@ -467,6 +490,7 @@ export default function SalesFormModal({
                     discount: '0',
                     description: '',
                     currency: 'ARS',
+                    status: 'draft',
                     was_payed: false,
                     with_shipping: false,
                     use_customer_address: false,
@@ -616,7 +640,6 @@ export default function SalesFormModal({
                 setFilteredCiudades(ciudades);
                 setShowCiudadDropdown(true);
             } catch (error) {
-                console.error('Error buscando ciudades:', error);
                 setFilteredCiudades([]);
             } finally {
                 setLoadingCiudades(false);
@@ -729,7 +752,6 @@ export default function SalesFormModal({
                     )
                 }));
             } catch (error) {
-                console.error('Error loading product units:', error);
                 const product = products.find(p => p.id === parseInt(value));
                 const basePrice = product ? (product.price || 0) : 0;
                 
@@ -866,8 +888,6 @@ export default function SalesFormModal({
             await onSubmit(submitData);
             onClose();
         } catch (error) {
-            console.error('Error submitting form:', error);
-            
             // Verificar si es un error de stock
             if (error.response?.data?.sales_items) {
                 const stockErrors = error.response.data.sales_items;
@@ -875,32 +895,68 @@ export default function SalesFormModal({
                 // Si es un array de errores, tomar el primero
                 const errorMessage = Array.isArray(stockErrors) ? stockErrors[0] : stockErrors;
                 
-                // Verificar si contiene información sobre otras ubicaciones
+                // Verificar si contiene información sobre otras ubicaciones disponibles
                 if (typeof errorMessage === 'string' && 
                     (errorMessage.includes('Stock disponible en otras ubicaciones') || 
                      errorMessage.includes('Stock en otras ubicaciones'))) {
                     
                     // Parsear el error
                     const parsedError = parseStockError(errorMessage);
+                    
                     setStockError(parsedError);
                     setAvailableBranches(parsedError.branches);
                     setAvailableWarehouses(parsedError.warehouses);
                     setShowStockModal(true);
                     return;
                 }
+                
+                // Si es error de stock sin ubicaciones alternativas
+                if (typeof errorMessage === 'string' && 
+                    (errorMessage.includes('Stock insuficiente') || 
+                     errorMessage.includes('No hay stock disponible'))) {
+                    
+                    setAlert({
+                        type: 'danger',
+                        title: 'Stock Insuficiente',
+                        message: errorMessage
+                    });
+                    return;
+                }
             }
             
-            // Si no es error de stock, mostrar errores normales
+            // Parsear todos los errores de validación
+            let errorMessages = [];
             if (error.response?.data) {
-                const backendErrors = {};
-                Object.keys(error.response.data).forEach(key => {
-                    const errorMsg = Array.isArray(error.response.data[key]) 
-                        ? error.response.data[key][0] 
-                        : error.response.data[key];
-                    backendErrors[key] = errorMsg;
+                const errorData = error.response.data;
+                Object.keys(errorData).forEach(key => {
+                    const errorValues = errorData[key];
+                    if (Array.isArray(errorValues)) {
+                        errorValues.forEach(msg => {
+                            errorMessages.push(`${msg}`);
+                        });
+                    } else if (typeof errorValues === 'string') {
+                        errorMessages.push(`${errorValues}`);
+                    }
                 });
-                setErrors(backendErrors);
             }
+            
+            // Mostrar errores en alerta
+            if (errorMessages.length > 0) {
+                setAlert({
+                    type: 'danger',
+                    title: 'Error de validación',
+                    message: errorMessages.join(' ')
+                });
+            } else {
+                setAlert({
+                    type: 'danger',
+                    title: 'Error',
+                    message: 'Ocurrió un error al procesar la orden. Por favor intenta nuevamente.'
+                });
+            }
+            
+            // Lanzar el error para que SalesPage.js sepa que hubo un problema
+            throw error;
         }
     };
 
@@ -942,6 +998,16 @@ export default function SalesFormModal({
                     {/* Form */}
                     <form onSubmit={handleSubmit} data-sales-form className="overflow-y-auto max-h-[calc(90vh-140px)]">
                         <div className="p-6 space-y-6">
+                            {/* Alert Component */}
+                            {alert && (
+                                <Alert
+                                    type={alert.type}
+                                    title={alert.title}
+                                    text={alert.message}
+                                    onClose={() => setAlert(null)}
+                                />
+                            )}
+
                             {/* Sección de Cliente - Solo en modo creación */}
                             {!salesOrder && (
                                 <div className="border border-[#18c29c]/30 bg-[#18c29c]/5 p-4 rounded-lg space-y-4">
@@ -1331,10 +1397,16 @@ export default function SalesFormModal({
                                             name="was_payed"
                                             checked={formData.was_payed}
                                             onChange={handleInputChange}
-                                            className="rounded border-gray-300 text-[#18c29c] shadow-sm focus:border-[#18c29c] focus:ring text-black focus:ring-[#18c29c] focus:ring-opacity-50"
+                                            disabled={formData.status === 'draft' || formData.status === 'pending' || formData.status === 'cancelled' || formData.status === 'completed'}
+                                            className="rounded border-gray-300 text-[#18c29c] shadow-sm focus:border-[#18c29c] focus:ring text-black focus:ring-[#18c29c] focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                         />
-                                        <span className="ml-2 text-sm text-gray-900">
+                                        <span className={`ml-2 text-sm ${formData.status === 'draft' || formData.status === 'pending' || formData.status === 'cancelled' || formData.status === 'completed' ? 'text-gray-400' : 'text-gray-900'}`}>
                                             Orden pagada
+                                            {(formData.status === 'draft' || formData.status === 'pending') && (
+                                                <span className="text-xs block text-gray-400">
+                                                    (Solo disponible en preparación)
+                                                </span>
+                                            )}
                                         </span>
                                     </label>
                                 </div>

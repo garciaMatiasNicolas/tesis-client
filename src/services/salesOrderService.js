@@ -1,5 +1,3 @@
-
-
 class SalesOrderService {
     constructor() {
         // Este service usará el hook useApiMethods, pero necesitamos
@@ -101,6 +99,8 @@ class SalesOrderService {
         if (!this.apiMethods) throw new Error('SalesOrderService not initialized');
         
         try {
+            // Para PATCH, solo enviamos los campos que cambian sin transformar todo
+            // No necesitamos transformar sales_items si no se envían
             const response = await this.apiMethods.patchMethod(`/billing/sales-orders/${saleId}/`, saleData);
             return response;
         } catch (error) {
@@ -245,6 +245,40 @@ class SalesOrderService {
             wholesale: 'Mayorista'
         };
         return channelMap[channel] || channel;
+    }
+
+    /**
+     * Descargar PDF de una orden de venta
+     * @param {number} saleId - ID de la orden de venta
+     * @returns {Promise} Descarga del PDF
+     */
+    async downloadPDF(saleId) {
+        if (!this.apiMethods) throw new Error('SalesOrderService not initialized');
+        
+        try {
+            // Usar getMethod con isResponseFile=true para obtener el blob
+            const response = await this.apiMethods.getMethod(
+                `/billing/sales-orders/${saleId}/download-pdf/`,
+                {},
+                true,
+                true // isResponseFile
+            );
+
+            // Crear blob desde la respuesta
+            const blob = new Blob([response.data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `orden_venta_${String(saleId).padStart(8, '0')}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Error downloading PDF:', error);
+            throw error;
+        }
     }
 
     /**

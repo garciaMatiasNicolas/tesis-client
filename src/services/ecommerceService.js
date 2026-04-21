@@ -100,27 +100,49 @@ const useEcommerceService = () => {
             }
         },
 
-        createUserForCustomerAndLogIn: async (userData, customerData) => {
+        createUserForCustomerAndLogIn: async (userData, customerData = {}) => {
             try {
-                // 1. Crear el usuario
-                const userResponse = await postMethod('/users/', userData, false); 
+                // 1. Registrar al cliente (crea User + Customer, o vincula si ya existe)
+                const registrationData = {
+                    email: userData.email,
+                    password: userData.password,
+                    confirm_password: userData.password,
+                    first_name: userData.first_name,
+                    last_name: userData.last_name,
+                    phone: customerData?.phone || '',
+                    address: customerData?.address || '',
+                    city: customerData?.city || '',
+                    state: customerData?.state || '',
+                    postal_code: customerData?.postal_code || '',
+                    country: customerData?.country || 'Argentina'
+                };
+                
+                const registerResponse = await postMethod('/ecommerce/register/', registrationData, false);
                 
                 // 2. Hacer login automático
-                const email = userData.email;
-                const password = userData.password;
-                const loginResponse = await postMethod('/auth/login/', { email, password, ecommerce: true }, false);
+                const loginResponse = await postMethod('/auth/login/', { 
+                    email: userData.email, 
+                    password: userData.password, 
+                    ecommerce: true 
+                }, false);
                 
-                // 3. Actualizar el customer profile con la data
-                await patchMethod('/ecommerce/customers/me/', customerData, true);
-
                 // 3. Guardar tokens de autenticación
                 const { access, refresh } = loginResponse;
                 setAuthTokenIntoCookie(access, refresh);
                 
+                // 4. Si el cliente tenía compras previas, informar al usuario
+                const message = registerResponse.linked_to_existing 
+                    ? 'Cuenta creada y vinculada exitosamente. Hemos vinculado tus compras previas.'
+                    : 'Cuenta creada exitosamente.';
+                
                 return {
-                    user_id: userResponse.id || loginResponse.user_id,
-                    user: userResponse,
-                    tokens: { access, refresh }
+                    user_id: registerResponse.user_id,
+                    customer_id: registerResponse.customer_id,
+                    user: registerResponse.user,
+                    customer: registerResponse.customer,
+                    tokens: { access, refresh },
+                    linked_to_existing: registerResponse.linked_to_existing,
+                    message: message
                 };
             } catch (error) {
                 console.error('Error al crear usuario y hacer login:', error);
@@ -226,6 +248,19 @@ const useEcommerceService = () => {
             }
         },
 
+        // Verificar si existe un customer con este email (con o sin usuario)
+        checkCustomerByEmail: async (email) => {
+            try {
+                // Este endpoint podría implementarse en el backend si se necesita
+                // Por ahora usamos checkUserByEmail que ya existe
+                const response = await getMethod(`/check-email/?email=${encodeURIComponent(email)}`, {}, false);
+                return response;
+            } catch (error) {
+                console.error('Error al verificar email:', error);
+                throw error;
+            }
+        },
+
         // Login de usuario existente
         loginUser: async (email, password) => {
             try {
@@ -279,6 +314,17 @@ const useEcommerceService = () => {
                 return response;
             } catch (error) {
                 console.error('Error al actualizar datos del cliente:', error);
+                throw error;
+            }
+        },
+
+        // Obtener los pedidos del cliente autenticado
+        getMyOrders: async () => {
+            try {
+                const response = await getMethod('/billing/sales-orders/my-orders/', {}, true);
+                return response;
+            } catch (error) {
+                console.error('Error al obtener pedidos del cliente:', error);
                 throw error;
             }
         }

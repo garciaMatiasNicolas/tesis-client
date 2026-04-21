@@ -1,6 +1,9 @@
 "use client";
-import React, { useState } from 'react';
-import { FaTimes, FaFileInvoice, FaCalendar, FaWarehouse, FaTruck, FaBox } from 'react-icons/fa';
+import React, { useState, useEffect } from 'react';
+import { 
+    FaTimes, FaFileInvoice, FaCalendar, FaWarehouse, FaTruck, FaBox,
+    FaClock, FaCheck, FaFileInvoiceDollar, FaShoppingCart
+} from 'react-icons/fa';
 import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
 import { formatDate as formatDateUtil, formatPrice } from '@/utils/formatData';
 
@@ -8,121 +11,203 @@ export default function PurchaseDetailModal({
     isOpen,
     onClose,
     purchase,
-    onUpdateStatus,
-    onUpdatePayment,
-    onUpdateReceived
+    onUpdateStatus
 }) {
-    if (!isOpen || !purchase) return null;
-
-    // Estados para modales de confirmación
+    const [updating, setUpdating] = useState(false);
+    const [alert, setAlert] = useState(null);
     const [confirmModal, setConfirmModal] = useState({
         isOpen: false,
-        type: null, // 'approve', 'reject', 'payment', 'received'
+        type: null,
         action: null,
         isProcessing: false,
         comment: '',
         requireComment: false
     });
-
     const [commentError, setCommentError] = useState('');
+
+   // Resetear alert cuando el modal se abre/cierra
+    useEffect(() => {
+        if (!isOpen) {
+            setAlert(null);
+            setUpdating(false);
+        }
+    }, [isOpen]);
+
+    if (!isOpen || !purchase) return null;
 
     // Usar funciones de formato de utils
     const formatDate = formatDateUtil;
     const formatCurrency = formatPrice;
 
-    // Obtener badge de estado
-    const getStatusBadge = (status) => {
-        const badges = {
-            'pending': {
-                label: 'Pendiente',
-                color: 'bg-yellow-100 text-yellow-800 border-yellow-200'
-            },
-            'approved': {
-                label: 'Aprobado',
-                color: 'bg-green-100 text-green-800 border-green-200'
-            },
-            'rejected': {
-                label: 'Rechazado',
-                color: 'bg-red-100 text-red-800 border-red-200'
-            }
-        };
-        
-        const badge = badges[status] || badges['pending'];
-        return (
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${badge.color}`}>
-                {badge.label}
-            </span>
-        );
+    // Status mapping
+    const statusMap = {
+        draft: { label: "Presupuesto", color: "text-gray-600 bg-gray-100", icon: FaFileInvoiceDollar, stepColor: "bg-gray-400" },
+        pending: { label: "Pendiente", color: "text-yellow-600 bg-yellow-100", icon: FaClock, stepColor: "bg-yellow-500" },
+        completed: { label: "Completada", color: "text-green-600 bg-green-100", icon: FaCheck, stepColor: "bg-green-600" },
+        cancelled: { label: "Cancelada", color: "text-red-600 bg-red-100", icon: FaTimes, stepColor: "bg-red-600" }
     };
 
-    // Obtener badge de comprado
-    const getBuyedBadge = (wasBuyed) => {
-        return wasBuyed ? (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border bg-green-100 text-green-800 border-green-200">
-                Sí
-            </span>
-        ) : (
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border bg-gray-100 text-gray-800 border-gray-200">
-                No
-            </span>
-        );
+    const StatusIcon = statusMap[purchase.status]?.icon || FaClock;
+
+    // Timeline steps configuration
+    const timelineSteps = [
+        { 
+            status: 'draft', 
+            label: 'Presupuesto', 
+            icon: FaFileInvoiceDollar,
+            description: 'Orden creada como presupuesto'
+        },
+        { 
+            status: 'pending', 
+            label: 'Pendiente', 
+            icon: FaClock,
+            description: 'En espera de pago y recepción'
+        },
+        { 
+            status: 'completed', 
+            label: 'Completada', 
+            icon: FaCheck,
+            description: 'Orden pagada y recibida'
+        }
+    ];
+
+    // Get current step index
+    const getCurrentStepIndex = () => {
+        return timelineSteps.findIndex(step => step.status === purchase.status);
     };
 
-    const handleStatusChange = (newStatus) => {
+    const currentStepIndex = getCurrentStepIndex();
+
+    // Determinar acciones disponibles según el estado actual
+    const getAvailableActions = () => {
+        const actions = [];
+
+        switch (purchase.status) {
+            case 'draft':
+                actions.push({
+                    label: 'Pasar a Pendiente',
+                    action: 'to_pending',
+                    color: 'bg-yellow-600 hover:bg-yellow-700',
+                    icon: FaClock,
+                    description: 'Marca la orden como pendiente de pago y recepción'
+                });
+                actions.push({
+                    label: 'Cancelar Orden',
+                    action: 'to_cancelled',
+                    color: 'bg-red-600 hover:bg-red-700',
+                    icon: FaTimes,
+                    description: 'Cancela esta orden de compra'
+                });
+                break;
+
+            case 'pending':
+                // Puede marcar como pagado
+                if (!purchase.was_payed) {
+                    actions.push({
+                        label: 'Marcar como Pagado',
+                        action: 'mark_payed',
+                        color: 'bg-green-600 hover:bg-green-700',
+                        icon: FaCheck,
+                        description: 'Marca la orden como pagada'
+                    });
+                }
+                
+                // Puede marcar como recibido solo si ya está pagado
+                if (purchase.was_payed && !purchase.received) {
+                    actions.push({
+                        label: 'Marcar como Recibido',
+                        action: 'mark_received',
+                        color: 'bg-blue-600 hover:bg-blue-700',
+                        icon: FaBox,
+                        description: 'Marca la mercancía como recibida'
+                    });
+                }
+
+                // Puede completar si está pagado y recibido
+                if (purchase.was_payed && purchase.received) {
+                    actions.push({
+                        label: 'Completar Orden',
+                        action: 'to_completed',
+                        color: 'bg-green-600 hover:bg-green-700',
+                        icon: FaCheck,
+                        description: 'Completa la orden de compra'
+                    });
+                }
+
+                actions.push({
+                    label: 'Cancelar Orden',
+                    action: 'to_cancelled',
+                    color: 'bg-red-600 hover:bg-red-700',
+                    icon: FaTimes,
+                    description: 'Cancela esta orden de compra'
+                });
+                break;
+
+            case 'completed':
+                // No hay acciones disponibles
+                break;
+
+            case 'cancelled':
+                // No hay acciones disponibles
+                break;
+        }
+
+        return actions;
+    };
+
+    const handleStatusUpdate = async (action) => {
+        if (!onUpdateStatus) return;
+
+        let updateData = {};
+        let requireComment = false; // Comentarios opcionales
+
+        switch (action) {
+            case 'to_pending':
+                updateData = { status: 'pending' };
+                break;
+            case 'to_completed':
+                updateData = { status: 'completed' };
+                break;
+            case 'to_cancelled':
+                updateData = { status: 'cancelled' };
+                break;
+            case 'mark_payed':
+                updateData = { was_payed: true };
+                break;
+            case 'mark_received':
+                const today = new Date().toISOString().split('T')[0];
+                updateData = { received: true, received_date: today };
+                break;
+        }
+
         setConfirmModal({
             isOpen: true,
-            type: newStatus === 'approved' ? 'approve' : 'reject',
-            action: (comment) => {
-                if (onUpdateStatus) {
-                    onUpdateStatus(purchase.id, newStatus, comment);
+            type: action,
+            action: async (comment) => {
+                try {
+                    setConfirmModal(prev => ({ ...prev, isProcessing: true }));
+                    
+                    // Solo incluir comment si no está vacío
+                    const updatePayload = { ...updateData };
+                    if (comment && comment.trim()) {
+                        updatePayload.comment = comment;
+                    }
+                    
+                    await onUpdateStatus(purchase.id, updatePayload);
+                    setConfirmModal({ isOpen: false, type: null, action: null, isProcessing: false, comment: '', requireComment: false });
                     onClose();
+                } catch (error) {
+                    console.error('Error updating purchase status:', error);
+                    setConfirmModal(prev => ({ ...prev, isProcessing: false }));
+                    setAlert({
+                        type: 'error',
+                        message: error.response?.data?.detail || 'Error al actualizar el estado'
+                    });
                 }
             },
             isProcessing: false,
             comment: '',
-            requireComment: true
-        });
-        setCommentError('');
-    };
-
-    const handlePaymentChange = (wasPayed) => {
-        setConfirmModal({
-            isOpen: true,
-            type: wasPayed ? 'mark-payed' : 'unmark-payed',
-            action: (comment) => {
-                if (onUpdatePayment) {
-                    setConfirmModal(prev => ({ ...prev, isProcessing: true }));
-                    onUpdatePayment(purchase.id, wasPayed, comment);
-                    setTimeout(() => {
-                        setConfirmModal({ isOpen: false, type: null, action: null, isProcessing: false, comment: '', requireComment: false });
-                        onClose();
-                    }, 500);
-                }
-            },
-            isProcessing: false,
-            comment: '',
-            requireComment: true
-        });
-        setCommentError('');
-    };
-
-    const handleReceivedChange = (received, receivedDate) => {
-        setConfirmModal({
-            isOpen: true,
-            type: received ? 'mark-received' : 'unmark-received',
-            action: (comment) => {
-                if (onUpdateReceived) {
-                    setConfirmModal(prev => ({ ...prev, isProcessing: true }));
-                    onUpdateReceived(purchase.id, received, receivedDate, comment);
-                    setTimeout(() => {
-                        setConfirmModal({ isOpen: false, type: null, action: null, isProcessing: false, comment: '', requireComment: false });
-                        onClose();
-                    }, 500);
-                }
-            },
-            isProcessing: false,
-            comment: '',
-            requireComment: true
+            requireComment
         });
         setCommentError('');
     };
@@ -136,10 +221,7 @@ export default function PurchaseDetailModal({
 
     const confirmAction = () => {
         if (confirmModal.action) {
-            if (confirmModal.requireComment && !confirmModal.comment.trim()) {
-                setCommentError('Debe ingresar un comentario.');
-                return;
-            }
+            // Si hay comentario lo enviamos, sino vacío
             confirmModal.action(confirmModal.comment.trim());
         }
     };
@@ -147,84 +229,78 @@ export default function PurchaseDetailModal({
     // Configuración del modal según el tipo de acción
     const getConfirmModalConfig = () => {
         const configs = {
-            'approve': {
-                actionType: 'warning',
-                title: 'Confirmar aprobación',
-                message: '¿Estás seguro de que deseas aprobar esta orden de compra?',
+            'to_pending': {
+                actionType: 'info',
+                title: 'Pasar a Pendiente',
+                message: '¿Confirmas pasar esta orden a estado pendiente?',
                 detailLabel: 'Orden',
                 detailValue: `# ORDEN ${purchase.id}`,
-                warningMessage: 'Esta acción puede activar procesos de facturación, notificaciones y actualización de inventario.',
-                confirmButtonText: 'Aprobar',
+                warningMessage: 'La orden estará en espera de pago y recepción. Se crearán movimientos de stock en tránsito.',
+                confirmButtonText: 'Confirmar',
+                confirmButtonColor: 'yellow'
+            },
+            'to_completed': {
+                actionType: 'success',
+                title: 'Completar Orden',
+                message: '¿Confirmas completar esta orden de compra?',
+                detailLabel: 'Orden',
+                detailValue: `# ORDEN ${purchase.id}`,
+                warningMessage: 'Esta acción es irreversible. La orden quedará finalizada y el stock se actualizará.',
+                confirmButtonText: 'Completar',
                 confirmButtonColor: 'green'
             },
-            'reject': {
+            'to_cancelled': {
                 actionType: 'warning',
-                title: 'Confirmar rechazo',
-                message: '¿Estás seguro de que deseas rechazar esta orden de compra?',
+                title: 'Cancelar Orden',
+                message: '¿Estás seguro de cancelar esta orden de compra?',
                 detailLabel: 'Orden',
                 detailValue: `# ORDEN ${purchase.id}`,
-                warningMessage: 'Esta acción cancelará la orden y puede notificar al proveedor.',
-                confirmButtonText: 'Rechazar',
+                warningMessage: 'Esta acción es irreversible. Se cancelarán los movimientos de stock asociados.',
+                confirmButtonText: 'Cancelar Orden',
                 confirmButtonColor: 'red'
             },
-            'mark-payed': {
-                actionType: 'info',
-                title: 'Marcar como pagado',
+            'mark_payed': {
+                actionType: 'success',
+                title: 'Marcar como Pagado',
                 message: '¿Confirmas que esta orden fue pagada?',
                 detailLabel: 'Orden',
-                detailValue: `# ORDEN ${purchase.id} - ${purchase.supplier?.name || 'Sin proveedor'}`,
-                warningMessage: 'Esto actualizará el estado de pago en el sistema y puede afectar reportes financieros.',
+                detailValue: `# ORDEN ${purchase.id}`,
+                warningMessage: 'Esto actualizará el estado de pago en el sistema.',
                 confirmButtonText: 'Marcar como Pagado',
                 confirmButtonColor: 'green'
             },
-            'unmark-payed': {
-                actionType: 'warning',
-                title: 'Marcar como no pagado',
-                message: '¿Estás seguro de revertir el estado de pago?',
-                detailLabel: 'Orden',
-                detailValue: `# ORDEN ${purchase.id}`,
-                warningMessage: 'Esto actualizará el estado de pago y puede afectar reportes financieros.',
-                confirmButtonText: 'Marcar como No Pagado',
-                confirmButtonColor: 'yellow'
-            },
-            'mark-received': {
+            'mark_received': {
                 actionType: 'success',
-                title: 'Confirmar recepción',
+                title: 'Marcar como Recibido',
                 message: '¿Confirmas que la mercancía fue recibida?',
                 detailLabel: 'Orden',
                 detailValue: `# ORDEN ${purchase.id}`,
-                warningMessage: 'Se registrará la fecha actual como fecha de recepción y puede actualizar el inventario.',
+                warningMessage: 'Se registrará la fecha actual como fecha de recepción.',
                 confirmButtonText: 'Confirmar Recepción',
                 confirmButtonColor: 'blue'
-            },
-            'unmark-received': {
-                actionType: 'warning',
-                title: 'Revertir recepción',
-                message: '¿Estás seguro de revertir el estado de recepción?',
-                detailLabel: 'Orden',
-                detailValue: `# ORDEN ${purchase.id}`,
-                warningMessage: 'Se eliminará la fecha de recepción y puede afectar el inventario.',
-                confirmButtonText: 'Revertir Recepción',
-                confirmButtonColor: 'yellow'
             }
         };
         return configs[confirmModal.type] || {};
     };
 
+    const availableActions = getAvailableActions();
+
     return (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+            <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-[#18c29c]/10 rounded-full flex items-center justify-center">
-                            <FaFileInvoice className="text-[#18c29c] text-lg" />
+                            <StatusIcon className="text-[#18c29c] text-lg" />
                         </div>
                         <div>
                             <h3 className="text-xl font-semibold text-gray-900">
                                 Orden de Compra #{purchase.id}
                             </h3>
-                            <p className="text-sm text-gray-500">Detalles de la Orden de Compra</p>
+                            <p className="text-sm text-gray-500">
+                                {statusMap[purchase.status]?.label || purchase.status}
+                            </p>
                         </div>
                     </div>
                     <button
@@ -235,8 +311,123 @@ export default function PurchaseDetailModal({
                     </button>
                 </div>
 
+                {/* Alert */}
+                {alert && (
+                    <div className={`mx-6 mt-6 p-4 rounded-lg ${
+                        alert.type === 'error' ? 'bg-red-50 text-red-800 border border-red-200' :
+                        alert.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' :
+                        'bg-blue-50 text-blue-800 border border-blue-200'
+                    }`}>
+                        <p className="text-sm">{alert.message}</p>
+                    </div>
+                )}
+
                 {/* Content */}
                 <div className="p-6 space-y-6">
+                    {/* Timeline Stepper */}
+                    {purchase.status !== 'cancelled' && (
+                        <div className="bg-gradient-to-r from-gray-50 to-white p-6 rounded-lg border border-gray-200">
+                            <h4 className="text-sm font-semibold text-gray-700 mb-6">Progreso de la Orden</h4>
+                            <div className="relative">
+                                {/* Línea de progreso */}
+                                <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200" style={{ zIndex: 0 }}></div>
+                                <div 
+                                    className="absolute top-5 left-0 h-1 bg-[#18c29c] transition-all duration-500"
+                                    style={{ 
+                                        width: `${(currentStepIndex / (timelineSteps.length - 1)) * 100}%`,
+                                        zIndex: 0
+                                    }}
+                                ></div>
+
+                                {/* Steps */}
+                                <div className="relative flex justify-between" style={{ zIndex: 1 }}>
+                                    {timelineSteps.map((step, index) => {
+                                        const StepIcon = step.icon;
+                                        const isCompleted = index < currentStepIndex;
+                                        const isCurrent = index === currentStepIndex;
+                                        const isPending = index > currentStepIndex;
+
+                                        return (
+                                            <div key={step.status} className="flex flex-col items-center flex-1">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                                                    isCompleted ? 'bg-[#18c29c] border-[#18c29c]' :
+                                                    isCurrent ? 'bg-white border-[#18c29c] ring-4 ring-[#18c29c]/20' :
+                                                    'bg-white border-gray-300'
+                                                } transition-all duration-300`}>
+                                                    <StepIcon className={`text-lg ${
+                                                        isCompleted ? 'text-white' :
+                                                        isCurrent ? 'text-[#18c29c]' :
+                                                        'text-gray-400'
+                                                    }`} />
+                                                </div>
+                                                <p className={`mt-2 text-xs font-medium text-center ${
+                                                    isCurrent ? 'text-[#18c29c]' : 'text-gray-600'
+                                                }`}>
+                                                    {step.label}
+                                                </p>
+                                                <p className="mt-1 text-xs text-gray-500 text-center max-w-[120px]">
+                                                    {step.description}
+                                                </p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Additional Status Info */}
+                            <div className="mt-6 pt-6 border-t border-gray-200 grid grid-cols-2 gap-4">
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-3 h-3 rounded-full ${purchase.was_payed ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                                    <span className="text-sm text-gray-700">
+                                        {purchase.was_payed ? 'Pagado' : 'Pendiente de pago'}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-3 h-3 rounded-full ${purchase.received ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                                    <span className="text-sm text-gray-700">
+                                        {purchase.received ? 'Recibido' : 'Pendiente de recepción'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Cancelled Status */}
+                    {purchase.status === 'cancelled' && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                            <div className="flex items-center gap-3">
+                                <FaTimes className="text-red-600 text-xl" />
+                                <div>
+                                    <h4 className="text-sm font-semibold text-red-800">Orden Cancelada</h4>
+                                    <p className="text-xs text-red-600 mt-1">Esta orden ha sido cancelada y no puede ser modificada.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Available Actions */}
+                    {availableActions.length > 0 && (
+                        <div className="bg-gradient-to-r from-blue-50 to-white p-6 rounded-lg border border-blue-200">
+                            <h4 className="text-sm font-semibold text-gray-700 mb-4">Acciones Disponibles</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {availableActions.map((action, index) => {
+                                    const ActionIcon = action.icon;
+                                    return (
+                                        <button
+                                            key={index}
+                                            onClick={() => handleStatusUpdate(action.action)}
+                                            disabled={updating}
+                                            className={`${action.color} text-white px-4 py-3 rounded-lg transition-all font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg flex items-center gap-2 justify-center`}
+                                        >
+                                            <ActionIcon />
+                                            {action.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Información General */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-4">
@@ -266,39 +457,6 @@ export default function PurchaseDetailModal({
                                         <div>
                                             <p className="text-xs text-gray-500">Moneda</p>
                                             <p className="text-sm font-medium text-gray-900">{purchase.currency || 'ARS'}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-2">
-                                        <div className="w-4 h-4 mt-1 flex items-center justify-center">
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500">Estado</p>
-                                            <div className="mt-1">
-                                                {getStatusBadge(purchase.status)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-2">
-                                        <div className="w-4 h-4 mt-1 flex items-center justify-center">
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500">¿Fue Pagado?</p>
-                                            <div className="mt-1">
-                                                {getBuyedBadge(purchase.was_payed)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-start gap-2">
-                                        <div className="w-4 h-4 mt-1 flex items-center justify-center">
-                                            <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-500">¿Fue Recibido?</p>
-                                            <div className="mt-1">
-                                                {getBuyedBadge(purchase.received)}
-                                            </div>
                                         </div>
                                     </div>
                                     {purchase.received_date && (
@@ -367,88 +525,6 @@ export default function PurchaseDetailModal({
                         </div>
                     </div>
 
-                    {/* Cambiar Estado */}
-                    {purchase.status !== 'approved' && purchase.status !== 'rejected' && (
-                        <div>
-                            <h4 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200">
-                                Cambiar Estado
-                            </h4>
-                            <div className="flex flex-wrap gap-2">
-                                {purchase.status === 'pending' && (
-                                    <>
-                                        <button
-                                            onClick={() => handleStatusChange('approved')}
-                                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
-                                        >
-                                            Aprobar Orden
-                                        </button>
-                                        <button
-                                            onClick={() => handleStatusChange('rejected')}
-                                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm font-medium"
-                                        >
-                                            Rechazar Orden
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {purchase.status !== 'rejected' && (
-                        <>
-                            {/* Actualizar Pago */}
-                            <div>
-                                <h4 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200">
-                                    Estado de Pago
-                                </h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {!purchase.was_payed ? (
-                                        <button
-                                            onClick={() => handlePaymentChange(true)}
-                                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm font-medium"
-                                        >
-                                            Marcar como Pagado
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={() => handlePaymentChange(false)}
-                                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium"
-                                        >
-                                            Marcar como No Pagado
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Actualizar Recepción */}
-                            <div>
-                                <h4 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200">
-                                    Estado de Recepción
-                                </h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {!purchase.received ? (
-                                        <button
-                                            onClick={() => {
-                                                const today = new Date().toISOString().split('T')[0];
-                                                handleReceivedChange(true, today);
-                                            }}
-                                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
-                                        >
-                                            Marcar como Recibido
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={() => handleReceivedChange(false, null)}
-                                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors text-sm font-medium"
-                                        >
-                                            Marcar como No Recibido
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </>
-                    )}
-
                     {/* Información de Transporte */}
                     {(purchase.transport || purchase.driver || purchase.patent) && (
                         <div>
@@ -482,7 +558,6 @@ export default function PurchaseDetailModal({
                     <div>
                         <h4 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200">
                             Productos ({purchase.items?.length || 0} items)
-                            {console.log(purchase.items)}
                         </h4>
                         <div className="bg-gray-50 rounded-lg overflow-hidden">
                             <table className="min-w-full divide-y divide-gray-200">
@@ -521,7 +596,7 @@ export default function PurchaseDetailModal({
                                                 </td>
                                                 <td className="px-4 py-3">
                                                     <span className="text-sm text-gray-700">
-                                                        {`${item.product_unit_name} x ${item.product_unit_conversion_factor}` || item.product_base_unit_name || 'Unidad'}
+                                                        {item.product_unit_name ? `${item.product_unit_name} x ${item.product_unit_conversion_factor}` : item.product_base_unit_name || 'Unidad'}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
@@ -595,7 +670,7 @@ export default function PurchaseDetailModal({
                     {purchase.comments && purchase.comments.length > 0 && (
                         <div>
                             <h4 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200">
-                                Comentarios
+                                Historial de Comentarios
                             </h4>
                             <div className="space-y-2">
                                 {purchase.comments.map((comment, index) => (
@@ -637,7 +712,6 @@ export default function PurchaseDetailModal({
                             </div>
                         </div>
                     )}
-
 
                     {/* Timestamps */}
                     <div className="border-t border-gray-200 pt-4">

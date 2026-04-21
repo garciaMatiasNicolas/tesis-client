@@ -4,8 +4,7 @@ import ProductCard from './ProductCard';
 const ProductGrid = ({ 
     products = [], 
     loading = false, 
-    onAddToCart, 
-    onViewDetails,
+    onAddToCart,
     currentPage,
     totalPages,
     onPageChange,
@@ -16,16 +15,16 @@ const ProductGrid = ({
         return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {[...Array(8)].map((_, index) => (
-            <div key={index} className="backdrop-blur-sm rounded-lg shadow-md overflow-hidden animate-pulse border border-[#9a334d30] bg-[#1e1e1e]">
-                <div className="h-48 md:h-56 bg-[#9a334d20]"></div>
+            <div key={index} className="backdrop-blur-sm rounded-lg shadow-md overflow-hidden animate-pulse border" style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main, backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card}}>
+                <div className="h-48 md:h-56" style={{backgroundColor: isDarkMode ? theme.primary.light : theme.primary.light}}></div>
                 <div className="p-4">
-                <div className="h-4 bg-[#9a334d20] rounded mb-2"></div>
-                <div className="h-6 bg-[#9a334d20] rounded mb-2"></div>
-                <div className="h-4 bg-[#9a334d20] rounded mb-3"></div>
-                <div className="h-8 bg-[#9a334d20] rounded mb-3"></div>
+                <div className="h-4 rounded mb-2" style={{backgroundColor: isDarkMode ? theme.primary.light : theme.primary.light}}></div>
+                <div className="h-6 rounded mb-2" style={{backgroundColor: isDarkMode ? theme.primary.light : theme.primary.light}}></div>
+                <div className="h-4 rounded mb-3" style={{backgroundColor: isDarkMode ? theme.primary.light : theme.primary.light}}></div>
+                <div className="h-8 rounded mb-3" style={{backgroundColor: isDarkMode ? theme.primary.light : theme.primary.light}}></div>
                 <div className="flex gap-2">
-                    <div className="flex-1 h-8 bg-[#9a334d20] rounded"></div>
-                    <div className="w-10 h-8 bg-[#9a334d20] rounded"></div>
+                    <div className="flex-1 h-8 rounded" style={{backgroundColor: isDarkMode ? theme.primary.light : theme.primary.light}}></div>
+                    <div className="w-10 h-8 rounded" style={{backgroundColor: isDarkMode ? theme.primary.light : theme.primary.light}}></div>
                 </div>
                 </div>
             </div>
@@ -68,7 +67,6 @@ const ProductGrid = ({
                     key={product.id}
                     product={product}
                     onAddToCart={onAddToCart}
-                    onViewDetails={onViewDetails}
                     isDarkMode={isDarkMode}
                     theme={theme}
                 />
@@ -77,18 +75,22 @@ const ProductGrid = ({
 
         {/* Paginación */}
         {totalPages > 1 && (
-            <div className="flex justify-center items-center space-x-2 backdrop-blur-sm rounded-lg p-4 border border-[#9a334d30] bg-[#1e1e1e]">
+            <div className="flex justify-center items-center space-x-2 backdrop-blur-sm rounded-lg p-4 border" style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main, backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card}}>
             {/* Botón anterior */}
             <button
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className={`
-                px-3 py-2 rounded-md text-sm font-medium transition-all
-                ${currentPage === 1
-                    ? 'bg-[#252525] text-gray-500 cursor-not-allowed'
-                    : 'bg-[#1e1e1e] text-[#9a334d] border border-[#9a334d50] bg-[#9a334d20] hover:bg-[#9a334d30]'
-                }
-                `}
+                className="px-3 py-2 rounded-md text-sm font-medium transition-all"
+                style={{
+                    backgroundColor: currentPage === 1 
+                        ? (isDarkMode ? theme.background.dark.elevated : theme.background.light.elevated)
+                        : (isDarkMode ? theme.background.dark.card : theme.background.light.card),
+                    color: currentPage === 1
+                        ? (isDarkMode ? theme.text.dark.muted : theme.text.light.muted)
+                        : (isDarkMode ? theme.primary.main : theme.primary.main),
+                    border: currentPage === 1 ? 'none' : `1px solid ${isDarkMode ? theme.border.dark.main : theme.border.light.main}`,
+                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+                }}
             >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

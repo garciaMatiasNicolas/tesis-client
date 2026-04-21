@@ -16,7 +16,7 @@ const ClientProfilePage = () => {
         storeConfig, 
         storeActive 
     } = useStoreWithTheme();
-    const { getCustomerData, updateCustomerProfile } = useEcommerceService();
+    const { getCustomerData, updateCustomerProfile, getMyOrders } = useEcommerceService();
     const { getMethod } = useApiMethods();
 
     // Estados
@@ -24,6 +24,7 @@ const ClientProfilePage = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [error, setErrors] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [ordersLoading, setOrdersLoading] = useState(true);
     const [showAlert, setShowAlert] = useState(false);
     const [alertConfig, setAlertConfig] = useState({
         type: 'success',
@@ -67,37 +68,23 @@ const ClientProfilePage = () => {
         }
     };
 
-    // Datos mockeados para pedidos
-    const [orders] = useState([
-        {
-            id: 'ORD-001',
-            date: '2024-10-20',
-            status: 'completed',
-            total: 2500.00,
-            items: [
-                { name: 'Vino Malbec Premium', quantity: 2, price: 1200.00 },
-                { name: 'Queso Brie', quantity: 1, price: 550.00 }
-            ]
-        },
-        {
-            id: 'ORD-002',
-            date: '2024-10-18',
-            status: 'shipped',
-            total: 1800.00,
-            items: [
-                { name: 'Aceitunas Gourmet', quantity: 3, price: 600.00 }
-            ]
-        },
-        {
-            id: 'ORD-003',
-            date: '2024-10-15',
-            status: 'processing',
-            total: 3200.00,
-            items: [
-                { name: 'Caja de Vinos Selectos', quantity: 1, price: 3200.00 }
-            ]
+    // Estado para pedidos reales
+    const [orders, setOrders] = useState([]);
+    const [expandedOrder, setExpandedOrder] = useState(null);
+
+    // Cargar pedidos del cliente
+    const loadOrders = async () => {
+        try {
+            setOrdersLoading(true);
+            const ordersData = await getMyOrders();
+            setOrders(ordersData);
+        } catch (error) {
+            console.error('Error al cargar pedidos:', error);
+            setOrders([]);
+        } finally {
+            setOrdersLoading(false);
         }
-    ]);
+    };
 
     // Verificar autenticación
     useEffect(() => {
@@ -116,9 +103,17 @@ const ClientProfilePage = () => {
             
             await getCustomer();
             setLoading(false);
+            console.log(`theme: ${JSON.stringify(theme)}`); // Debug del tema
         };
         checkAuth();
     }, [router]);
+
+    // Cargar pedidos cuando se selecciona la pestaña de pedidos
+    useEffect(() => {
+        if (activeTab === 'orders' && !loading) {
+            loadOrders();
+        }
+    }, [activeTab, loading]);
  
     // Handlers
     const handleInputChange = (e) => {
@@ -204,10 +199,12 @@ const ClientProfilePage = () => {
         switch (status) {
             case 'completed':
                 return '#10b981';
-            case 'shipped':
-                return '#3b82f6';
-            case 'processing':
+            case 'pending':
                 return '#f59e0b';
+            case 'processing':
+                return '#3b82f6';
+            case 'draft':
+                return '#6b7280';
             case 'cancelled':
                 return '#ef4444';
             default:
@@ -219,15 +216,66 @@ const ClientProfilePage = () => {
         switch (status) {
             case 'completed':
                 return 'Completado';
-            case 'shipped':
-                return 'Enviado';
+            case 'pending':
+                return 'Confirmado';
             case 'processing':
-                return 'Procesando';
+                return 'En Preparación';
+            case 'draft':
+                return 'Presupuesto';
             case 'cancelled':
                 return 'Cancelado';
             default:
                 return status;
         }
+    };
+
+    const getStatusProgress = (status) => {
+        switch (status) {
+            case 'draft':
+                return { percentage: 25, step: '1 de 4' };
+            case 'pending':
+                return { percentage: 50, step: '2 de 4' };
+            case 'processing':
+                return { percentage: 75, step: '3 de 4' };
+            case 'completed':
+                return { percentage: 100, step: '4 de 4' };
+            case 'cancelled':
+                return { percentage: 0, step: 'Cancelado' };
+            default:
+                return { percentage: 0, step: '-' };
+        }
+    };
+
+    const toggleOrderExpanded = (orderId) => {
+        setExpandedOrder(expandedOrder === orderId ? null : orderId);
+    };
+
+    const timelineSteps = [
+        { 
+            status: 'draft', 
+            label: 'Presupuesto',
+            description: 'Tu pedido ha sido creado como presupuesto'
+        },
+        { 
+            status: 'pending', 
+            label: 'Confirmado',
+            description: 'Pedido confirmado, stock reservado'
+        },
+        { 
+            status: 'processing', 
+            label: 'En Preparación',
+            description: 'Tu pedido está siendo preparado'
+        },
+        { 
+            status: 'completed', 
+            label: 'Completado',
+            description: 'Pedido entregado con éxito'
+        }
+    ];
+
+    const getCurrentStepIndex = (status) => {
+        if (status === 'cancelled') return -1;
+        return timelineSteps.findIndex(step => step.status === status);
     };
 
     if (loading) {
@@ -710,72 +758,275 @@ const ClientProfilePage = () => {
                                 Pedidos Recientes
                             </h2>
 
-                            <div className="space-y-4">
-                                {orders.filter(order => order.status !== 'completed').map((order) => (
-                                    <div key={order.id} className="border rounded-lg p-4"
-                                        style={{ 
-                                            borderColor: isDarkMode 
-                                                ? theme.border?.dark?.light || '#9a334d30' 
-                                                : theme.border?.light?.light || '#9a334d20'
-                                        }}>
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <h3 className="font-semibold"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.primary || '#ffffff' 
-                                                            : theme.text?.light?.primary || '#252525'
-                                                    }}>
-                                                    Pedido {order.id}
-                                                </h3>
-                                                <p className="text-sm"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                                            : theme.text?.light?.secondary || '#3e3e3e'
-                                                    }}>
-                                                    {new Date(order.date).toLocaleDateString()}
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="px-3 py-1 rounded-full text-sm font-medium text-white"
-                                                    style={{ backgroundColor: getStatusColor(order.status) }}>
-                                                    {getStatusText(order.status)}
-                                                </div>
-                                                <p className="text-lg font-bold mt-2"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.primary || '#ffffff' 
-                                                            : theme.text?.light?.primary || '#252525'
-                                                    }}>
-                                                    ${order.total.toFixed(2)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        
-                                        <div className="space-y-2">
-                                            {order.items.map((item, index) => (
-                                                <div key={index} className="flex justify-between text-sm">
-                                                    <span style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                                            : theme.text?.light?.secondary || '#3e3e3e'
-                                                    }}>
-                                                        {item.name} x{item.quantity}
-                                                    </span>
-                                                    <span style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.primary || '#ffffff' 
-                                                            : theme.text?.light?.primary || '#252525'
-                                                    }}>
-                                                        ${item.price.toFixed(2)}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
+                            {ordersLoading ? (
+                                <div className="text-center py-8">
+                                    <div className="w-8 h-8 border-t-2 border-r-2 rounded-full animate-spin mx-auto mb-4"
+                                        style={{ borderColor: isDarkMode ? theme.primary?.dark?.main || '#7a2639' : theme.primary?.light?.main || '#9a334d' }}>
                                     </div>
-                                ))}
-                            </div>
+                                    <p style={{ color: isDarkMode ? theme.text?.dark?.secondary || '#e0e0e0' : theme.text?.light?.secondary || '#3e3e3e' }}>
+                                        Cargando pedidos...
+                                    </p>
+                                </div>
+                            ) : orders.length === 0 ? (
+                                <div className="text-center py-8 border rounded-lg"
+                                    style={{ 
+                                        borderColor: isDarkMode 
+                                            ? theme.border?.dark?.light || '#9a334d30' 
+                                            : theme.border?.light?.light || '#9a334d20'
+                                    }}>
+                                    <p style={{ 
+                                        color: isDarkMode 
+                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                            : theme.text?.light?.secondary || '#3e3e3e'
+                                    }}>
+                                        No tienes pedidos aún
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {orders.filter(order => order.status !== 'completed').map((order) => {
+                                        const currentStepIndex = getCurrentStepIndex(order.status);
+                                        const isExpanded = expandedOrder === order.id;
+                                        
+                                        return (
+                                            <div key={order.id} className="border rounded-lg overflow-hidden transition-all duration-300"
+                                                style={{ 
+                                                    borderColor: isDarkMode 
+                                                        ? theme.border?.dark?.light || '#9a334d30' 
+                                                        : theme.border?.light?.light || '#9a334d20'
+                                                }}>
+                                                <div className="p-4">
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <div>
+                                                            <h3 className="font-semibold"
+                                                                style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.primary || '#ffffff' 
+                                                                        : theme.text?.light?.primary || '#252525'
+                                                                }}>
+                                                                Pedido #{order.id}
+                                                            </h3>
+                                                            <p className="text-sm"
+                                                                style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                                        : theme.text?.light?.secondary || '#3e3e3e'
+                                                                }}>
+                                                                {new Date(order.created_at).toLocaleDateString()}
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="px-3 py-1 rounded-full text-sm font-medium text-white"
+                                                                style={{ backgroundColor: getStatusColor(order.status) }}>
+                                                                {getStatusText(order.status)}
+                                                            </div>
+                                                            <p className="text-lg font-bold mt-2"
+                                                                style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.primary || '#ffffff' 
+                                                                        : theme.text?.light?.primary || '#252525'
+                                                                }}>
+                                                                ${parseFloat(order.total_price).toFixed(2)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="space-y-2 mb-3">
+                                                        {order.sales_items && order.sales_items.slice(0, 2).map((item, index) => (
+                                                            <div key={index} className="flex justify-between text-sm">
+                                                                <span style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                                        : theme.text?.light?.secondary || '#3e3e3e'
+                                                                }}>
+                                                                    {item.product_name} x{item.quantity}
+                                                                </span>
+                                                                <span style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.primary || '#ffffff' 
+                                                                        : theme.text?.light?.primary || '#252525'
+                                                                }}>
+                                                                    ${(parseFloat(item.unit_price) * item.quantity).toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                        {order.sales_items && order.sales_items.length > 2 && (
+                                                            <p className="text-xs"
+                                                                style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                                        : theme.text?.light?.secondary || '#3e3e3e'
+                                                                }}>
+                                                                +{order.sales_items.length - 2} producto(s) más
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Botón de expandir */}
+                                                    <button
+                                                        onClick={() => toggleOrderExpanded(order.id)}
+                                                        className="w-full py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2"
+                                                        style={{ 
+                                                            backgroundColor: isDarkMode 
+                                                                ? theme.background?.dark?.elevated || '#2a2a2a' 
+                                                                : theme.background?.light?.elevated || '#f5f5f5',
+                                                            color: isDarkMode 
+                                                                ? theme.text?.dark?.primary || '#ffffff' 
+                                                                : theme.text?.light?.primary || '#252525'
+                                                        }}
+                                                    >
+                                                        {isExpanded ? '▲ Ocultar detalles' : '▼ Ver seguimiento del pedido'}
+                                                    </button>
+                                                </div>
+
+                                                {/* Contenido expandible */}
+                                                {isExpanded && (
+                                                    <div className="px-4 pb-4 pt-2 border-t"
+                                                        style={{ 
+                                                            borderColor: isDarkMode 
+                                                                ? theme.border?.dark?.light || '#9a334d30' 
+                                                                : theme.border?.light?.light || '#9a334d20',
+                                                            backgroundColor: isDarkMode 
+                                                                ? 'rgba(154, 51, 77, 0.05)' 
+                                                                : 'rgba(154, 51, 77, 0.03)'
+                                                        }}
+                                                    >
+                                                        <h4 className="text-sm font-semibold mb-4"
+                                                            style={{ 
+                                                                color: isDarkMode 
+                                                                    ? theme.text?.dark?.primary || '#ffffff' 
+                                                                    : theme.text?.light?.primary || '#252525'
+                                                            }}>
+                                                            📍 Seguimiento del Pedido
+                                                        </h4>
+
+                                                        {order.status !== 'cancelled' ? (
+                                                            <div className="space-y-3">
+                                                                {timelineSteps.map((step, index) => {
+                                                                    const isCompleted = index < currentStepIndex;
+                                                                    const isCurrent = index === currentStepIndex;
+                                                                    const isPending = index > currentStepIndex;
+
+                                                                    return (
+                                                                        <div key={step.status} className="flex gap-3">
+                                                                            {/* Icono y línea */}
+                                                                            <div className="flex flex-col items-center">
+                                                                                <div 
+                                                                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold transition-all duration-300 ${
+                                                                                        isCurrent ? 'ring-4 ring-opacity-30' : ''
+                                                                                    }`}
+                                                                                    style={{ 
+                                                                                        backgroundColor: isCompleted || isCurrent 
+                                                                                            ? getStatusColor(step.status)
+                                                                                            : isDarkMode ? '#3a3a3a' : '#e0e0e0',
+                                                                                        ringColor: isCurrent ? getStatusColor(step.status) : 'transparent'
+                                                                                    }}
+                                                                                >
+                                                                                    {isCompleted ? '✓' : index + 1}
+                                                                                </div>
+                                                                                {index < timelineSteps.length - 1 && (
+                                                                                    <div 
+                                                                                        className="w-0.5 h-12 transition-all duration-300"
+                                                                                        style={{ 
+                                                                                            backgroundColor: isCompleted 
+                                                                                                ? getStatusColor(step.status)
+                                                                                                : isDarkMode ? '#3a3a3a' : '#e0e0e0'
+                                                                                        }}
+                                                                                    />
+                                                                                )}
+                                                                            </div>
+
+                                                                            {/* Contenido */}
+                                                                            <div className="flex-1 pb-8">
+                                                                                <h5 className={`font-semibold ${isCurrent ? 'text-base' : 'text-sm'}`}
+                                                                                    style={{ 
+                                                                                        color: isCompleted || isCurrent
+                                                                                            ? (isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary)
+                                                                                            : (isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary)
+                                                                                    }}>
+                                                                                    {step.label}
+                                                                                    {isCurrent && (
+                                                                                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full"
+                                                                                            style={{ 
+                                                                                                backgroundColor: getStatusColor(step.status),
+                                                                                                color: 'white'
+                                                                                            }}>
+                                                                                            Actual
+                                                                                        </span>
+                                                                                    )}
+                                                                                </h5>
+                                                                                <p className="text-xs mt-1"
+                                                                                    style={{ 
+                                                                                        color: isDarkMode 
+                                                                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                                                            : theme.text?.light?.secondary || '#3e3e3e'
+                                                                                    }}>
+                                                                                    {step.description}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-center py-4">
+                                                                <div className="text-3xl mb-2">❌</div>
+                                                                <p className="font-semibold"
+                                                                    style={{ 
+                                                                        color: isDarkMode 
+                                                                            ? theme.text?.dark?.primary || '#ffffff' 
+                                                                            : theme.text?.light?.primary || '#252525'
+                                                                    }}>
+                                                                    Pedido Cancelado
+                                                                </p>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Todos los items */}
+                                                        {order.sales_items && order.sales_items.length > 0 && (
+                                                            <div className="mt-4 pt-4 border-t"
+                                                                style={{ 
+                                                                    borderColor: isDarkMode 
+                                                                        ? theme.border?.dark?.light || '#9a334d30' 
+                                                                        : theme.border?.light?.light || '#9a334d20'
+                                                                }}>
+                                                                <h5 className="text-sm font-semibold mb-2"
+                                                                    style={{ 
+                                                                        color: isDarkMode 
+                                                                            ? theme.text?.dark?.primary || '#ffffff' 
+                                                                            : theme.text?.light?.primary || '#252525'
+                                                                    }}>
+                                                                    📦 Productos del pedido
+                                                                </h5>
+                                                                <div className="space-y-2">
+                                                                    {order.sales_items.map((item, index) => (
+                                                                        <div key={index} className="flex justify-between text-sm">
+                                                                            <span style={{ 
+                                                                                color: isDarkMode 
+                                                                                    ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                                                    : theme.text?.light?.secondary || '#3e3e3e'
+                                                                            }}>
+                                                                                {item.product_name} x{item.quantity}
+                                                                            </span>
+                                                                            <span style={{ 
+                                                                                color: isDarkMode 
+                                                                                    ? theme.text?.dark?.primary || '#ffffff' 
+                                                                                    : theme.text?.light?.primary || '#252525'
+                                                                            }}>
+                                                                                ${(parseFloat(item.unit_price) * item.quantity).toFixed(2)}
+                                                                            </span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -791,92 +1042,289 @@ const ClientProfilePage = () => {
                                 Historial de Compras
                             </h2>
 
-                            <div className="space-y-4">
-                                {orders.map((order) => (
-                                    <div key={order.id} className="border rounded-lg p-4"
-                                        style={{ 
-                                            borderColor: isDarkMode 
-                                                ? theme.border?.dark?.light || '#9a334d30' 
-                                                : theme.border?.light?.light || '#9a334d20'
-                                        }}>
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div>
-                                                <h3 className="font-semibold"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.primary || '#ffffff' 
-                                                            : theme.text?.light?.primary || '#252525'
-                                                    }}>
-                                                    Pedido {order.id}
-                                                </h3>
-                                                <p className="text-sm"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                                            : theme.text?.light?.secondary || '#3e3e3e'
-                                                    }}>
-                                                    {new Date(order.date).toLocaleDateString()}
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <div className="px-3 py-1 rounded-full text-sm font-medium text-white"
-                                                    style={{ backgroundColor: getStatusColor(order.status) }}>
-                                                    {getStatusText(order.status)}
-                                                </div>
-                                                <p className="text-lg font-bold mt-2"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.primary || '#ffffff' 
-                                                            : theme.text?.light?.primary || '#252525'
-                                                    }}>
-                                                    ${order.total.toFixed(2)}
-                                                </p>
-                                            </div>
-                                        </div>
+                            {ordersLoading ? (
+                                <div className="text-center py-8">
+                                    <div className="w-8 h-8 border-t-2 border-r-2 rounded-full animate-spin mx-auto mb-4"
+                                        style={{ borderColor: isDarkMode ? theme.primary?.dark?.main || '#7a2639' : theme.primary?.light?.main || '#9a334d' }}>
+                                    </div>
+                                    <p style={{ color: isDarkMode ? theme.text?.dark?.secondary || '#e0e0e0' : theme.text?.light?.secondary || '#3e3e3e' }}>
+                                        Cargando pedidos...
+                                    </p>
+                                </div>
+                            ) : orders.length === 0 ? (
+                                <div className="text-center py-8 border rounded-lg"
+                                    style={{ 
+                                        borderColor: isDarkMode 
+                                            ? theme.border?.dark?.light || '#9a334d30' 
+                                            : theme.border?.light?.light || '#9a334d20'
+                                    }}>
+                                    <p style={{ 
+                                        color: isDarkMode 
+                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                            : theme.text?.light?.secondary || '#3e3e3e'
+                                    }}>
+                                        No tienes pedidos aún
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {orders.map((order) => {
+                                        const currentStepIndex = getCurrentStepIndex(order.status);
+                                        const isExpanded = expandedOrder === order.id;
                                         
-                                        <div className="space-y-2">
-                                            {order.items.map((item, index) => (
-                                                <div key={index} className="flex justify-between text-sm">
-                                                    <span style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                                            : theme.text?.light?.secondary || '#3e3e3e'
-                                                    }}>
-                                                        {item.name} x{item.quantity}
-                                                    </span>
-                                                    <span style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.primary || '#ffffff' 
-                                                            : theme.text?.light?.primary || '#252525'
-                                                    }}>
-                                                        ${item.price.toFixed(2)}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        {order.status === 'completed' && (
-                                            <div className="mt-4 pt-4 border-t"
+                                        return (
+                                            <div key={order.id} className="border rounded-lg overflow-hidden transition-all duration-300"
                                                 style={{ 
                                                     borderColor: isDarkMode 
                                                         ? theme.border?.dark?.light || '#9a334d30' 
                                                         : theme.border?.light?.light || '#9a334d20'
                                                 }}>
-                                                <button
-                                                    className="text-sm font-medium transition-all hover:opacity-80"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.primary?.dark?.main || '#7a2639' 
-                                                            : theme.primary?.light?.main || '#9a334d'
-                                                    }}
-                                                >
-                                                    Volver a pedir
-                                                </button>
+                                                <div className="p-4">
+                                                    <div className="flex justify-between items-start mb-3">
+                                                        <div>
+                                                            <h3 className="font-semibold"
+                                                                style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.primary || '#ffffff' 
+                                                                        : theme.text?.light?.primary || '#252525'
+                                                                }}>
+                                                                Pedido #{order.id}
+                                                            </h3>
+                                                            <p className="text-sm"
+                                                                style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                                        : theme.text?.light?.secondary || '#3e3e3e'
+                                                                }}>
+                                                                {new Date(order.created_at).toLocaleDateString()}
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <div className="px-3 py-1 rounded-full text-sm font-medium text-white"
+                                                                style={{ backgroundColor: getStatusColor(order.status) }}>
+                                                                {getStatusText(order.status)}
+                                                            </div>
+                                                            <p className="text-lg font-bold mt-2"
+                                                                style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.primary || '#ffffff' 
+                                                                        : theme.text?.light?.primary || '#252525'
+                                                                }}>
+                                                                ${parseFloat(order.total_price).toFixed(2)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="space-y-2 mb-3">
+                                                        {order.sales_items && order.sales_items.slice(0, 2).map((item, index) => (
+                                                            <div key={index} className="flex justify-between text-sm">
+                                                                <span style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                                        : theme.text?.light?.secondary || '#3e3e3e'
+                                                                }}>
+                                                                    {item.product_name} x{item.quantity}
+                                                                </span>
+                                                                <span style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.primary || '#ffffff' 
+                                                                        : theme.text?.light?.primary || '#252525'
+                                                                }}>
+                                                                    ${(parseFloat(item.unit_price) * item.quantity).toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                        {order.sales_items && order.sales_items.length > 2 && (
+                                                            <p className="text-xs"
+                                                                style={{ 
+                                                                    color: isDarkMode 
+                                                                        ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                                        : theme.text?.light?.secondary || '#3e3e3e'
+                                                                }}>
+                                                                +{order.sales_items.length - 2} producto(s) más
+                                                            </p>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Botón de expandir */}
+                                                    <button
+                                                        onClick={() => toggleOrderExpanded(order.id)}
+                                                        className="w-full py-2 rounded-md text-sm font-medium transition-all flex items-center justify-center gap-2"
+                                                        style={{ 
+                                                            backgroundColor: isDarkMode 
+                                                                ? theme.background?.dark?.elevated || '#2a2a2a' 
+                                                                : theme.background?.light?.elevated || '#f5f5f5',
+                                                            color: isDarkMode 
+                                                                ? theme.text?.dark?.primary || '#ffffff' 
+                                                                : theme.text?.light?.primary || '#252525'
+                                                        }}
+                                                    >
+                                                        {isExpanded ? '▲ Ocultar detalles' : '▼ Ver seguimiento del pedido'}
+                                                    </button>
+                                                </div>
+
+                                                {/* Contenido expandible */}
+                                                {isExpanded && (
+                                                    <div className="px-4 pb-4 pt-2 border-t"
+                                                        style={{ 
+                                                            borderColor: isDarkMode 
+                                                                ? theme.border?.dark?.light || '#9a334d30' 
+                                                                : theme.border?.light?.light || '#9a334d20',
+                                                            backgroundColor: isDarkMode 
+                                                                ? 'rgba(154, 51, 77, 0.05)' 
+                                                                : 'rgba(154, 51, 77, 0.03)'
+                                                        }}
+                                                    >
+                                                        <h4 className="text-sm font-semibold mb-4"
+                                                            style={{ 
+                                                                color: isDarkMode 
+                                                                    ? theme.text?.dark?.primary || '#ffffff' 
+                                                                    : theme.text?.light?.primary || '#252525'
+                                                            }}>
+                                                            📍 Seguimiento del Pedido
+                                                        </h4>
+
+                                                        {order.status !== 'cancelled' ? (
+                                                            <div className="space-y-3">
+                                                                {timelineSteps.map((step, index) => {
+                                                                    const isCompleted = index < currentStepIndex;
+                                                                    const isCurrent = index === currentStepIndex;
+                                                                    const isPending = index > currentStepIndex;
+
+                                                                    return (
+                                                                        <div key={step.status} className="flex gap-3">
+                                                                            {/* Icono y línea */}
+                                                                            <div className="flex flex-col items-center">
+                                                                                <div 
+                                                                                    className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold transition-all duration-300 ${
+                                                                                        isCurrent ? 'ring-4 ring-opacity-30' : ''
+                                                                                    }`}
+                                                                                    style={{ 
+                                                                                        backgroundColor: isCompleted || isCurrent 
+                                                                                            ? getStatusColor(step.status)
+                                                                                            : isDarkMode ? '#3a3a3a' : '#e0e0e0',
+                                                                                        ringColor: isCurrent ? getStatusColor(step.status) : 'transparent'
+                                                                                    }}
+                                                                                >
+                                                                                    {isCompleted ? '✓' : index + 1}
+                                                                                </div>
+                                                                                {index < timelineSteps.length - 1 && (
+                                                                                    <div 
+                                                                                        className="w-0.5 h-12 transition-all duration-300"
+                                                                                        style={{ 
+                                                                                            backgroundColor: isCompleted 
+                                                                                                ? getStatusColor(step.status)
+                                                                                                : isDarkMode ? '#3a3a3a' : '#e0e0e0'
+                                                                                        }}
+                                                                                    />
+                                                                                )}
+                                                                            </div>
+
+                                                                            {/* Contenido */}
+                                                                            <div className="flex-1 pb-8">
+                                                                                <h5 className={`font-semibold ${isCurrent ? 'text-base' : 'text-sm'}`}
+                                                                                    style={{ 
+                                                                                        color: isCompleted || isCurrent
+                                                                                            ? (isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary)
+                                                                                            : (isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary)
+                                                                                    }}>
+                                                                                    {step.label}
+                                                                                    {isCurrent && (
+                                                                                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full"
+                                                                                            style={{ 
+                                                                                                backgroundColor: getStatusColor(step.status),
+                                                                                                color: 'white'
+                                                                                            }}>
+                                                                                            Actual
+                                                                                        </span>
+                                                                                    )}
+                                                                                </h5>
+                                                                                <p className="text-xs mt-1"
+                                                                                    style={{ 
+                                                                                        color: isDarkMode 
+                                                                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                                                            : theme.text?.light?.secondary || '#3e3e3e'
+                                                                                    }}>
+                                                                                    {step.description}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-center py-4">
+                                                                <div className="text-3xl mb-2">❌</div>
+                                                                <p className="font-semibold"
+                                                                    style={{ 
+                                                                        color: isDarkMode 
+                                                                            ? theme.text?.dark?.primary || '#ffffff' 
+                                                                            : theme.text?.light?.primary || '#252525'
+                                                                    }}>
+                                                                    Pedido Cancelado
+                                                                </p>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Todos los items */}
+                                                        {order.sales_items && order.sales_items.length > 0 && (
+                                                            <div className="mt-4 pt-4 border-t"
+                                                                style={{ 
+                                                                    borderColor: isDarkMode 
+                                                                        ? theme.border?.dark?.light || '#9a334d30' 
+                                                                        : theme.border?.light?.light || '#9a334d20'
+                                                                }}>
+                                                                <h5 className="text-sm font-semibold mb-2"
+                                                                    style={{ 
+                                                                        color: isDarkMode 
+                                                                            ? theme.text?.dark?.primary || '#ffffff' 
+                                                                            : theme.text?.light?.primary || '#252525'
+                                                                    }}>
+                                                                    📦 Productos del pedido
+                                                                </h5>
+                                                                <div className="space-y-2">
+                                                                    {order.sales_items.map((item, index) => (
+                                                                        <div key={index} className="flex justify-between text-sm">
+                                                                            <span style={{ 
+                                                                                color: isDarkMode 
+                                                                                    ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                                                    : theme.text?.light?.secondary || '#3e3e3e'
+                                                                            }}>
+                                                                                {item.product_name} x{item.quantity}
+                                                                            </span>
+                                                                            <span style={{ 
+                                                                                color: isDarkMode 
+                                                                                    ? theme.text?.dark?.primary || '#ffffff' 
+                                                                                    : theme.text?.light?.primary || '#252525'
+                                                                            }}>
+                                                                                ${(parseFloat(item.unit_price) * item.quantity).toFixed(2)}
+                                                                            </span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+
+                                                                {/* Botón volver a pedir para completados */}
+                                                                {order.status === 'completed' && (
+                                                                    <button
+                                                                        className="mt-4 text-sm font-medium transition-all hover:opacity-80"
+                                                                        style={{ 
+                                                                            color: isDarkMode 
+                                                                                ? theme.primary?.dark?.main || '#7a2639' 
+                                                                                : theme.primary?.light?.main || '#9a334d'
+                                                                        }}
+                                                                    >
+                                                                        🔄 Volver a pedir
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
 
                             {/* Estadísticas */}
                             <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -916,7 +1364,7 @@ const ClientProfilePage = () => {
                                                 ? theme.primary?.dark?.main || '#7a2639' 
                                                 : theme.primary?.light?.main || '#9a334d'
                                         }}>
-                                        ${orders.reduce((sum, order) => sum + order.total, 0).toFixed(0)}
+                                        ${orders.reduce((sum, order) => sum + parseFloat(order.total_price || 0), 0).toFixed(0)}
                                     </div>
                                     <div className="text-sm"
                                         style={{ 
@@ -940,7 +1388,7 @@ const ClientProfilePage = () => {
                                                 ? theme.primary?.dark?.main || '#7a2639' 
                                                 : theme.primary?.light?.main || '#9a334d'
                                         }}>
-                                        ${(orders.reduce((sum, order) => sum + order.total, 0) / orders.length).toFixed(0)}
+                                        ${orders.length > 0 ? (orders.reduce((sum, order) => sum + parseFloat(order.total_price || 0), 0) / orders.length).toFixed(0) : '0'}
                                     </div>
                                     <div className="text-sm"
                                         style={{ 
