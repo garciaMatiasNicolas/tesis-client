@@ -1,4 +1,4 @@
-import CategoriesPage from '@components/pages/inventory/categories/CategoriesPage';
+import CategoriesPage from '@/components/pages/inventory/categories/CategoriesPage';
 import ProtectedRoute from '@/services/ProtectedRoute';
 
 

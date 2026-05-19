@@ -1,4 +1,4 @@
-import ResetPassword from "@components/pages/auth/ResetPassword";
+import ResetPassword from "@/components/pages/auth/ResetPassword";
 
 
 const Page = () => {
