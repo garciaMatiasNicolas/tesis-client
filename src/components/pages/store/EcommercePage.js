@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
 import useEcommerceService from '@/services/ecommerceService';
-import '../../themes/modeTransitions.css';
+import '../../../themes/modeTransitions.css';
 import StoreHeader from '@/components/store/StoreHeader';
 import { useCart } from '@/hooks/useCart';
 import { useStoreWithTheme } from '@/hooks/useStore';
