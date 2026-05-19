@@ -204,8 +204,33 @@ export default function SupplierModal({
     };
 
     const handleAddSupplier = async () => {
+        // Validar campos obligatorios
+        const validationErrors = {};
+        
         if (!newSupplier.name.trim()) {
-            setErrors({ name: ['El nombre es obligatorio'] });
+            validationErrors.name = ['El nombre es obligatorio'];
+        }
+        if (!newSupplier.email.trim()) {
+            validationErrors.email = ['El correo electrónico es obligatorio'];
+        }
+        if (!newSupplier.phone.trim()) {
+            validationErrors.phone = ['El teléfono es obligatorio'];
+        }
+        if (!newSupplier.address.trim()) {
+            validationErrors.address = ['La dirección es obligatoria'];
+        }
+        if (!newSupplier.country.trim()) {
+            validationErrors.country = ['El país es obligatorio'];
+        }
+        if (!newSupplier.state.trim()) {
+            validationErrors.state = ['La provincia/estado es obligatoria'];
+        }
+        if (!newSupplier.city.trim()) {
+            validationErrors.city = ['La ciudad es obligatoria'];
+        }
+        
+        if (Object.keys(validationErrors).length > 0) {
+            setErrors(validationErrors);
             return;
         }
 
@@ -376,7 +401,7 @@ export default function SupplierModal({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Correo Electrónico
+                                    Correo Electrónico <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
@@ -395,7 +420,7 @@ export default function SupplierModal({
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Teléfono
+                                    Teléfono <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
@@ -479,10 +504,12 @@ export default function SupplierModal({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    País
+                                    País <span className="text-red-500">*</span>
                                 </label>
                                 <select
-                                    className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all"
+                                    className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
+                                        errors.country ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                    }`}
                                     value={newSupplier.country}
                                     onChange={e => handleCountryChange(e.target.value)}
                                 >
@@ -502,17 +529,24 @@ export default function SupplierModal({
                                     <option value="Estados Unidos">Estados Unidos</option>
                                     <option value="Otro">Otro</option>
                                 </select>
+                                {errors.country && (
+                                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                        <span>⚠</span> {errors.country[0]}
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Provincia/Estado
+                                    Provincia/Estado <span className="text-red-500">*</span>
                                     {newSupplier.country === 'Argentina' && loadingProvincias && (
                                         <FaSpinner className="inline ml-2 animate-spin text-gray-400 text-xs" />
                                     )}
                                 </label>
                                 {newSupplier.country === 'Argentina' ? (
                                     <select
-                                        className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all"
+                                        className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
+                                            errors.state ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                        }`}
                                         value={selectedProvinciaId || ''}
                                         onChange={handleProvinciaChange}
                                         disabled={loadingProvincias}
@@ -526,16 +560,23 @@ export default function SupplierModal({
                                     </select>
                                 ) : (
                                     <input
-                                        className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all"
+                                        className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
+                                            errors.state ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                        }`}
                                         placeholder="Ej: Buenos Aires"
                                         value={newSupplier.state}
                                         onChange={e => setNewSupplier({ ...newSupplier, state: e.target.value })}
                                     />
                                 )}
+                                {errors.state && (
+                                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                        <span>⚠</span> {errors.state[0]}
+                                    </p>
+                                )}
                             </div>
                             <div className="relative">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Ciudad/Localidad
+                                    Ciudad/Localidad <span className="text-red-500">*</span>
                                     {newSupplier.country === 'Argentina' && loadingCiudades && (
                                         <FaSpinner className="inline ml-2 animate-spin text-gray-400 text-xs" />
                                     )}
@@ -555,7 +596,9 @@ export default function SupplierModal({
                                                         setShowCityDropdown(true);
                                                     }
                                                 }}
-                                                className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all"
+                                                className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
+                                                    errors.city ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                                }`}
                                                 placeholder={selectedProvinciaId ? "Buscar ciudad..." : "Primero seleccione provincia"}
                                                 disabled={!selectedProvinciaId}
                                             />
@@ -586,11 +629,18 @@ export default function SupplierModal({
                                     </>
                                 ) : (
                                     <input
-                                        className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all"
+                                        className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
+                                            errors.city ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                        }`}
                                         placeholder="Ej: La Plata"
                                         value={newSupplier.city}
                                         onChange={e => setNewSupplier({ ...newSupplier, city: e.target.value })}
                                     />
+                                )}
+                                {errors.city && (
+                                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                        <span>⚠</span> {errors.city[0]}
+                                    </p>
                                 )}
                             </div>
                             <div>
@@ -606,14 +656,21 @@ export default function SupplierModal({
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Dirección
+                                    Dirección <span className="text-red-500">*</span>
                                 </label>
                                 <input
-                                    className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all"
+                                    className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
+                                        errors.address ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                                    }`}
                                     placeholder="Calle, número, piso, departamento"
                                     value={newSupplier.address}
                                     onChange={e => setNewSupplier({ ...newSupplier, address: e.target.value })}
                                 />
+                                {errors.address && (
+                                    <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                        <span>⚠</span> {errors.address[0]}
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </div>

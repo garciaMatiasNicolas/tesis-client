@@ -211,8 +211,8 @@ const WarehousePage = () => {
             
             <SideBar
                 onProfile={() => window.location.href = "/profile"}
-                onSupport={() => alert("Soporte")}
-                onLogout={() => alert("Cerrar sesión")}
+                onSupport={() => showAlert('info', 'Soporte', 'Funcionalidad en desarrollo')}
+                onLogout={() => showAlert('info', 'Logout', 'Funcionalidad en desarrollo')}
             />
             <main className="flex-1 p-4 md:p-8 h-screen overflow-y-auto">
                 <WarehouseTable
@@ -225,6 +225,8 @@ const WarehousePage = () => {
                     searchTerm={searchTerm}
                     onSearchChange={(term) => setSearchTerm(term)}
                     showActions={showActions}
+                    onReload={loadWarehouses}
+                    onShowAlert={showAlert}
                 />
             </main>
         </div>

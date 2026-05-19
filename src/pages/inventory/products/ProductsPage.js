@@ -1,56 +1,30 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import SideBar from "@/components/ui/SideBar";
+import Alert from "@/components/ui/Alert";
 import Link from "next/link";
 import useProductService from "@/services/productService";
 import ProductsTable from "@/components/products/ProductsTable";
-import { FaPlus, FaSearch, FaFilter, FaSpinner } from "react-icons/fa";
+import { FaPlus } from "react-icons/fa";
 
 export default function ProductsPage() {
-    const [products, setProducts] = useState([]);
-    const [categories, setCategories] = useState(["Todas"]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState("Todas");
-    const [showFilters, setShowFilters] = useState(false);
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, product: null });
     const [isDeleting, setIsDeleting] = useState(false);
     const [deleteType, setDeleteType] = useState('discontinue'); // 'discontinue' o 'permanent'
     const [permanentDeleteConfirmModal, setPermanentDeleteConfirmModal] = useState({ isOpen: false, product: null });
     const [reactivateModal, setReactivateModal] = useState({ isOpen: false, product: null });
     const [isReactivating, setIsReactivating] = useState(false);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
+    const [alert, setAlert] = useState(null);
 
     const productService = useProductService();
 
-    // Cargar datos desde el backend
-    useEffect(() => {
-        const fetchData = async () => {
-        try {
-            setLoading(true);
-            setError(null);
-            
-            // Cargar productos y categorías en paralelo
-            const [productsData, categoriesData] = await Promise.all([
-                productService.getAllProducts(),
-                productService.getAllCategories()
-            ]);
-
-            setProducts(productsData || []);
-            
-            // Crear lista de categorías con "Todas" al inicio
-            const categoryNames = categoriesData?.map(cat => cat.name) || [];
-            setCategories(["Todas", ...categoryNames]);
-            
-        } catch (err) {
-            setError('Error al cargar los datos. Por favor, intenta nuevamente.');
-        } finally {
-            setLoading(false);
+    const showAlert = (type, title, message) => {
+        setAlert({ type, title, message });
+        if (type === 'success') {
+            setTimeout(() => setAlert(null), 5000);
         }
-        };
-
-        fetchData();
-    }, []);
+    };
 
     // Manejar eliminación de producto
     const handleDeleteProduct = (product) => {
@@ -66,14 +40,10 @@ export default function ProductsPage() {
             if (deleteType === 'discontinue') {
                 // Eliminación lógica - marcar como descontinuado
                 await productService.deleteProduct(deleteModal.product.id);
-                // Actualizar el producto en la lista con el nuevo estado
-                setProducts(products.map(p => 
-                    p.id === deleteModal.product.id 
-                        ? { ...p, status: 'discontinued' }
-                        : p
-                ));
                 setDeleteModal({ isOpen: false, product: null });
                 setDeleteType('discontinue');
+                // Trigger refresh de la tabla
+                setRefreshTrigger(prev => prev + 1);
             } else {
                 // Eliminación permanente - abrir segundo modal de confirmación
                 setPermanentDeleteConfirmModal({ isOpen: true, product: deleteModal.product });
@@ -101,9 +71,9 @@ export default function ProductsPage() {
             setIsDeleting(true);
             // Eliminación física permanente
             await productService.permanentDeleteProduct(permanentDeleteConfirmModal.product.id);
-            // Eliminar el producto de la lista
-            setProducts(products.filter(p => p.id !== permanentDeleteConfirmModal.product.id));
             setPermanentDeleteConfirmModal({ isOpen: false, product: null });
+            // Trigger refresh de la tabla
+            setRefreshTrigger(prev => prev + 1);
         } catch (err) {
             alert('Error al eliminar el producto permanentemente. Por favor, intenta nuevamente.');
         } finally {
@@ -128,13 +98,9 @@ export default function ProductsPage() {
         try {
             setIsReactivating(true);
             await productService.reactivateProduct(reactivateModal.product.id);
-            // Actualizar el producto en la lista
-            setProducts(products.map(p => 
-                p.id === reactivateModal.product.id 
-                    ? { ...p, status: 'active' }
-                    : p
-            ));
             setReactivateModal({ isOpen: false, product: null });
+            // Trigger refresh de la tabla
+            setRefreshTrigger(prev => prev + 1);
         } catch (err) {
             console.error('Error al reactivar producto:', err);
             alert('Error al reactivar el producto. Por favor, intenta nuevamente.');
@@ -149,19 +115,18 @@ export default function ProductsPage() {
         }
     };
 
-    // Filtrar productos
-    const filteredProducts = products.filter(product => {
-        const matchesSearch = (product.description?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                            (product.sku?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                            (product.category?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
-        
-        const matchesCategory = selectedCategory === "Todas" || product.category?.name === selectedCategory;
-        
-        return matchesSearch && matchesCategory;
-    });
-
     return (
         <div className="flex min-h-screen bg-[#f8fafc]">
+            {/* Alert component */}
+            {alert && (
+                <Alert
+                    type={alert.type}
+                    title={alert.title}
+                    message={alert.message}
+                    onClose={() => setAlert(null)}
+                />
+            )}
+            
             <SideBar
                 onProfile={() => window.location.href = "/profile"}
                 onSupport={() => showAlert("info", "Soporte", "Funcionalidad en desarrollo")}
@@ -186,99 +151,13 @@ export default function ProductsPage() {
                         </div>
                     </div>
 
-                    {/* Loading State */}
-                    {loading && (
-                        <div className="flex items-center justify-center py-12">
-                            <div className="text-center">
-                                <FaSpinner className="animate-spin mx-auto h-8 w-8 text-[#18c29c] mb-4" />
-                                <p className="text-gray-600">Cargando productos...</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Error State */}
-                    {error && (
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="text-red-600">⚠️</div>
-                                <div>
-                                    <h3 className="text-sm font-medium text-red-800">Error al cargar los datos</h3>
-                                    <p className="text-sm text-red-700 mt-1">{error}</p>
-                                </div>
-                                <button
-                                    onClick={() => window.location.reload()}
-                                    className="ml-auto bg-red-100 hover:bg-red-200 text-red-800 px-3 py-1 rounded text-sm transition-colors"
-                                >
-                                    Reintentar
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Content - Solo mostrar si no hay loading ni error */}
-                    {!loading && !error && (
-                        <>
-                            {/* Filtros y búsqueda */}
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-6">
-                                <div className="flex flex-col lg:flex-row gap-4">
-                                    {/* Barra de búsqueda */}
-                                    <div className="flex-1">
-                                        <div className="relative">
-                                            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                                            <input
-                                                type="text"
-                                                placeholder="Buscar por SKU, descripción o categoría..."
-                                                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent text-gray-900"
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Filtro de categoría */}
-                                    <div className="lg:w-64">
-                                        <select
-                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent text-gray-900"
-                                            value={selectedCategory}
-                                            onChange={(e) => setSelectedCategory(e.target.value)}
-                                        >
-                                            {categories.map(category => (
-                                                <option key={category} value={category}>
-                                                    {category}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
-
-                                    {/* Botón de filtros avanzados */}
-                                    <button
-                                        onClick={() => setShowFilters(!showFilters)}
-                                        className="lg:hidden flex items-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-gray-900"
-                                    >
-                                        <FaFilter className="text-sm" />
-                                        Filtros
-                                    </button>
-                                </div>
-
-                                {/* Resultados */}
-                                <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-                                    <span>
-                                    Mostrando {filteredProducts.length} de {products.length} productos
-                                    </span>
-                                    <span className="text-[#18c29c] font-medium">
-                                    Stock total: {products.reduce((sum, p) => sum + (p.stock_total || 0), 0)} unidades
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Tabla de productos */}
-                            <ProductsTable
-                                products={filteredProducts}
-                                onDeleteProduct={handleDeleteProduct}
-                                onReactivateProduct={handleReactivateProduct}
-                            />
-                        </>
-                    )}
+                    {/* Tabla de productos */}
+                    <ProductsTable
+                        key={refreshTrigger}
+                        onDeleteProduct={handleDeleteProduct}
+                        onReactivateProduct={handleReactivateProduct}
+                        onShowAlert={showAlert}
+                    />
                 </div>
             </main>
             

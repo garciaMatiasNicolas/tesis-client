@@ -46,7 +46,6 @@ export default function CustomerTable({
         });
 
         setFilteredCustomers(filtered);
-        console.log(customers)
     }, [customers, searchTerm, selectedType, selectedCountry]);
 
     // Efecto para obtener tipos y países únicos
@@ -127,13 +126,6 @@ export default function CustomerTable({
     const handleCloseDetailModal = () => {
         setIsDetailModalOpen(false);
         setSelectedCustomer(null);
-    };
-
-    // Callback cuando se agrega un contacto (para recargar datos si es necesario)
-    const handleContactAdded = () => {
-        // Aquí podrías recargar la lista de clientes si es necesario
-        // Por ahora solo cerramos y podríamos notificar al componente padre
-        console.log('Contact added successfully');
     };
 
     // Loading state
@@ -541,7 +533,7 @@ export default function CustomerTable({
                 isOpen={isDetailModalOpen}
                 onClose={handleCloseDetailModal}
                 customer={selectedCustomer}
-                onContactAdded={handleContactAdded}
+                //onContactAdded={handleContactAdded}
             />
         </div>
     );

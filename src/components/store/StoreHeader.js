@@ -71,7 +71,6 @@ const StoreHeader = ({isDarkMode, storeConfig, theme, setIsCartOpen, getTotalCar
         try {
             // Usar el servicio de login
             const result = await loginUser(loginData.email, loginData.password);
-            console.log('Login successful:', result);
             
             // Cerrar modal y verificar autenticación
             setShowLoginModal(false);
@@ -246,14 +245,6 @@ const StoreHeader = ({isDarkMode, storeConfig, theme, setIsCartOpen, getTotalCar
                             </div>
                         )}
                     </div>
-                    
-                    {/* Mensaje si es view_only */}
-                    {storeConfig?.view_only && (
-                        <div style={{ color: isDarkMode ? theme.text.dark.secondary : theme.text.light.secondary }} className={`text-sm font-medium`}>
-                            Modo catálogo
-                        </div>
-                    )}
-
                 </div>
             </div>
             </div>

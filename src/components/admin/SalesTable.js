@@ -255,7 +255,7 @@ export default function SalesTable({
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-gray-600">Monto Total</p>
-                            <p className="text-2xl font-bold text-gray-900">
+                            <p className="text-2xl font-bold text-gray-900 text-right">
                                 {formatPrice(filteredStats.total_amount)}
                             </p>
                         </div>
@@ -304,7 +304,7 @@ export default function SalesTable({
                         <select
                             value={selectedDeliveryStatus}
                             onChange={(e) => setSelectedDeliveryStatus(e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent"
+                            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent text-gray-800"
                         >
                             {deliveryStatusOptions.map(status => (
                                 <option key={status} value={status}>
@@ -407,7 +407,7 @@ export default function SalesTable({
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
                                             {formatPrice(sale.total_price, sale.currency)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">

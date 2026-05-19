@@ -1,6 +1,6 @@
 "use client";
 import React, { useRef, useState, useEffect } from "react";
-import { FaCamera, FaDollarSign, FaTag, FaWeight, FaRulerVertical, FaRulerHorizontal, FaCube, FaBoxes, FaSpinner, FaTimes } from "react-icons/fa";
+import { FaCamera, FaDollarSign, FaTag, FaWeight, FaRulerVertical, FaRulerHorizontal, FaCube, FaBoxes, FaSpinner, FaTimes, FaSearch } from "react-icons/fa";
 import useProductService from "@/services/productService";
 import Alert from "@/components/ui/Alert";
 
@@ -54,9 +54,22 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
   const [suppliers, setSuppliers] = useState([]);
   
   // Selected values
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedSubcategory, setSelectedSubcategory] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedSubcategory, setSelectedSubcategory] = useState(null);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
+  
+  // Search states for dropdowns
+  const [supplierSearch, setSupplierSearch] = useState('');
+  const [filteredSuppliers, setFilteredSuppliers] = useState([]);
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  
+  const [categorySearch, setCategorySearch] = useState('');
+  const [filteredCategories, setFilteredCategories] = useState([]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  
+  const [subcategorySearch, setSubcategorySearch] = useState('');
+  const [filteredSubcategories, setFilteredSubcategories] = useState([]);
+  const [showSubcategoryDropdown, setShowSubcategoryDropdown] = useState(false);
   
   // UI states
   const [loading, setLoading] = useState(true);
@@ -198,9 +211,24 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
             product_type: product.product_type || 'physical'
           });
           
-          setSelectedCategory(product.category?.id || '');
-          setSelectedSubcategory(product.subcategory?.id || '');
-          setSelectedSupplier(product.supplier || null);
+          // Set selected values with proper object structure
+          if (product.category) {
+            const cat = categoriesData.find(c => c.id === product.category.id);
+            setSelectedCategory(cat || null);
+            setCategorySearch(cat?.name || '');
+          }
+          
+          if (product.subcategory) {
+            const sub = subcategoriesData.find(s => s.id === product.subcategory.id);
+            setSelectedSubcategory(sub || null);
+            setSubcategorySearch(sub?.name || '');
+          }
+          
+          if (product.supplier) {
+            const sup = suppliersData.find(s => s.id === product.supplier.id);
+            setSelectedSupplier(sup || null);
+            setSupplierSearch(sup?.name || '');
+          }
           
           // Cargar imágenes existentes si hay
           if (product.image_1) setImagePreview1(product.image_1);
@@ -233,6 +261,29 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
     loadInitialData();
   }, [product]);
 
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (!event.target.closest('.supplier-search-container')) {
+        setShowSupplierDropdown(false);
+      }
+      if (!event.target.closest('.category-search-container')) {
+        setShowCategoryDropdown(false);
+      }
+      if (!event.target.closest('.subcategory-search-container')) {
+        setShowSubcategoryDropdown(false);
+      }
+    };
+
+    if (showSupplierDropdown || showCategoryDropdown || showSubcategoryDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSupplierDropdown, showCategoryDropdown, showSubcategoryDropdown]);
+
   // Handle form input changes
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -262,6 +313,90 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
   // Handle removing a product unit
   const handleRemoveProductUnit = (unitId) => {
     setProductUnits(prev => prev.filter(u => u.id !== unitId));
+  };
+
+  // Handle supplier search
+  const handleSupplierSearch = (value) => {
+    setSupplierSearch(value);
+    
+    if (value.length >= 2) {
+      const filtered = suppliers.filter(supplier => {
+        const searchLower = value.toLowerCase();
+        return supplier.name.toLowerCase().includes(searchLower) ||
+               (supplier.email && supplier.email.toLowerCase().includes(searchLower)) ||
+               (supplier.cuit && supplier.cuit.includes(searchLower));
+      });
+      setFilteredSuppliers(filtered);
+      setShowSupplierDropdown(true);
+    } else {
+      setFilteredSuppliers([]);
+      setShowSupplierDropdown(false);
+    }
+  };
+
+  // Handle supplier selection
+  const handleSelectSupplier = (supplier) => {
+    setSelectedSupplier(supplier);
+    setSupplierSearch(supplier.name);
+    setShowSupplierDropdown(false);
+  };
+
+  // Handle category search
+  const handleCategorySearch = (value) => {
+    setCategorySearch(value);
+    
+    if (value.length >= 2) {
+      const filtered = categories.filter(category => {
+        const searchLower = value.toLowerCase();
+        return category.name.toLowerCase().includes(searchLower);
+      });
+      setFilteredCategories(filtered);
+      setShowCategoryDropdown(true);
+    } else {
+      setFilteredCategories([]);
+      setShowCategoryDropdown(false);
+    }
+  };
+
+  // Handle category selection
+  const handleSelectCategory = (category) => {
+    setSelectedCategory(category);
+    setCategorySearch(category.name);
+    setShowCategoryDropdown(false);
+    // Reset subcategory when category changes
+    setSelectedSubcategory(null);
+    setSubcategorySearch('');
+  };
+
+  // Handle subcategory search
+  const handleSubcategorySearch = (value) => {
+    setSubcategorySearch(value);
+    
+    if (!selectedCategory) {
+      setFilteredSubcategories([]);
+      setShowSubcategoryDropdown(false);
+      return;
+    }
+    
+    if (value.length >= 2) {
+      const filtered = subcategories.filter(sub => {
+        const belongsToCategory = sub.category === selectedCategory.id || sub.category_id === selectedCategory.id;
+        const searchLower = value.toLowerCase();
+        return belongsToCategory && sub.name.toLowerCase().includes(searchLower);
+      });
+      setFilteredSubcategories(filtered);
+      setShowSubcategoryDropdown(true);
+    } else {
+      setFilteredSubcategories([]);
+      setShowSubcategoryDropdown(false);
+    }
+  };
+
+  // Handle subcategory selection
+  const handleSelectSubcategory = (subcategory) => {
+    setSelectedSubcategory(subcategory);
+    setSubcategorySearch(subcategory.name);
+    setShowSubcategoryDropdown(false);
   };
   // Handle image selection for specific slot
   const handleImageSelect = (e, slot) => {
@@ -383,8 +518,8 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
       
       const productData = {
         ...formData,
-        category: selectedCategory || null,
-        subcategory: selectedSubcategory || null,
+        category: selectedCategory?.id || null,
+        subcategory: selectedSubcategory?.id || null,
         supplier: selectedSupplier?.id || null,
         price: parseFloat(formData.price) || 0,
         cost_price: parseFloat(formData.cost_price) || 0,
@@ -493,9 +628,12 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
             promotional_price: '',
             product_type: 'physical'
           });
-          setSelectedCategory('');
-          setSelectedSubcategory('');
+          setSelectedCategory(null);
+          setCategorySearch('');
+          setSelectedSubcategory(null);
+          setSubcategorySearch('');
           setSelectedSupplier(null);
+          setSupplierSearch('');
           setProductUnits([]);
           setNewUnitName('');
           setNewUnitFactor('');
@@ -515,14 +653,34 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
     }
   };
 
-  // Filter subcategories by selected category
-  const filteredSubcategories = subcategories.filter(
-    sub => {
-      if (!selectedCategory) return false;
-      const categoryId = parseInt(selectedCategory);
-      return sub.category === categoryId || sub.category_id === categoryId;
-    }
-  );
+  // Clear supplier search when clicking clear button
+  const handleClearSupplier = () => {
+    setSelectedSupplier(null);
+    setSupplierSearch('');
+    setFilteredSuppliers([]);
+    setShowSupplierDropdown(false);
+  };
+
+  // Clear category search when clicking clear button
+  const handleClearCategory = () => {
+    setSelectedCategory(null);
+    setCategorySearch('');
+    setFilteredCategories([]);
+    setShowCategoryDropdown(false);
+    // Also clear subcategory
+    setSelectedSubcategory(null);
+    setSubcategorySearch('');
+    setFilteredSubcategories([]);
+    setShowSubcategoryDropdown(false);
+  };
+
+  // Clear subcategory search when clicking clear button
+  const handleClearSubcategory = () => {
+    setSelectedSubcategory(null);
+    setSubcategorySearch('');
+    setFilteredSubcategories([]);
+    setShowSubcategoryDropdown(false);
+  };
 
   if (loading) {
     return (
@@ -857,22 +1015,61 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
             <label className="block font-semibold mb-2 text-gray-800">
               Proveedor (opcional)
             </label>
-            <select
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
-              value={selectedSupplier?.id || ''}
-              onChange={(e) => {
-                const supplierId = e.target.value;
-                const supplier = suppliers.find(s => s.id === parseInt(supplierId));
-                setSelectedSupplier(supplier || null);
-              }}
-            >
-              <option value="">Seleccionar proveedor</option>
-              {suppliers.map(supplier => (
-                <option key={supplier.id} value={supplier.id}>
-                  {supplier.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative supplier-search-container">
+              <div className="flex items-center">
+                <FaSearch className="text-[#18c29c] absolute left-3 z-10" />
+                <input
+                  type="text"
+                  value={supplierSearch}
+                  onChange={(e) => handleSupplierSearch(e.target.value)}
+                  onFocus={() => {
+                    if (filteredSuppliers.length > 0) {
+                      setShowSupplierDropdown(true);
+                    }
+                  }}
+                  placeholder="Buscar proveedor por nombre, email o CUIT..."
+                  className="w-full pl-10 pr-10 border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+                />
+                {selectedSupplier && (
+                  <button
+                    type="button"
+                    onClick={handleClearSupplier}
+                    className="absolute right-3 text-gray-400 hover:text-gray-600"
+                  >
+                    <FaTimes />
+                  </button>
+                )}
+              </div>
+              
+              {/* Dropdown de resultados */}
+              {showSupplierDropdown && filteredSuppliers.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {filteredSuppliers.map((supplier) => (
+                    <div
+                      key={supplier.id}
+                      onClick={() => handleSelectSupplier(supplier)}
+                      className="px-4 py-2 hover:bg-[#18c29c]/10 cursor-pointer border-b border-gray-100 last:border-b-0"
+                    >
+                      <div className="font-medium text-gray-900">{supplier.name}</div>
+                      {supplier.email && (
+                        <div className="text-xs text-gray-500">{supplier.email}</div>
+                      )}
+                      {supplier.cuit && (
+                        <div className="text-xs text-gray-500">CUIT: {supplier.cuit}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {selectedSupplier && (
+                <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="text-sm text-green-800">
+                    ✓ Proveedor seleccionado: <strong>{selectedSupplier.name}</strong>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Product Type */}
@@ -1115,35 +1312,113 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
 
           {/* Categories and Subcategories */}
           <div className="mb-8 flex flex-wrap gap-6">
+            {/* Category Search */}
             <div className="flex-1 min-w-[250px]">
               <label className="block font-semibold mb-2 text-gray-800">Categoría</label>
-              <select
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
-                value={selectedCategory}
-                onChange={(e) => {
-                  setSelectedCategory(e.target.value);
-                  setSelectedSubcategory(''); // Reset subcategory when category changes
-                }}
-              >
-                <option value="">Seleccionar categoría</option>
-                {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
-                ))}
-              </select>
+              <div className="relative category-search-container">
+                <div className="flex items-center">
+                  <FaSearch className="text-[#18c29c] absolute left-3 z-10" />
+                  <input
+                    type="text"
+                    value={categorySearch}
+                    onChange={(e) => handleCategorySearch(e.target.value)}
+                    onFocus={() => {
+                      if (filteredCategories.length > 0) {
+                        setShowCategoryDropdown(true);
+                      }
+                    }}
+                    placeholder="Buscar categoría..."
+                    className="w-full pl-10 pr-10 border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+                  />
+                  {selectedCategory && (
+                    <button
+                      type="button"
+                      onClick={handleClearCategory}
+                      className="absolute right-3 text-gray-400 hover:text-gray-600"
+                    >
+                      <FaTimes />
+                    </button>
+                  )}
+                </div>
+                
+                {/* Dropdown de resultados */}
+                {showCategoryDropdown && filteredCategories.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {filteredCategories.map((category) => (
+                      <div
+                        key={category.id}
+                        onClick={() => handleSelectCategory(category)}
+                        className="px-4 py-2 hover:bg-[#18c29c]/10 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">{category.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {selectedCategory && (
+                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="text-sm text-green-800">
+                      ✓ <strong>{selectedCategory.name}</strong>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+            
+            {/* Subcategory Search */}
             <div className="flex-1 min-w-[250px]">
               <label className="block font-semibold mb-2 text-gray-800">Subcategoría</label>
-              <select
-                className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
-                value={selectedSubcategory}
-                onChange={(e) => setSelectedSubcategory(e.target.value)}
-                disabled={!selectedCategory}
-              >
-                <option value="">Seleccionar subcategoría</option>
-                {filteredSubcategories.map(sub => (
-                  <option key={sub.id} value={sub.id}>{sub.name}</option>
-                ))}
-              </select>
+              <div className="relative subcategory-search-container">
+                <div className="flex items-center">
+                  <FaSearch className="text-[#18c29c] absolute left-3 z-10" />
+                  <input
+                    type="text"
+                    value={subcategorySearch}
+                    onChange={(e) => handleSubcategorySearch(e.target.value)}
+                    onFocus={() => {
+                      if (filteredSubcategories.length > 0) {
+                        setShowSubcategoryDropdown(true);
+                      }
+                    }}
+                    placeholder={selectedCategory ? "Buscar subcategoría..." : "Primero selecciona una categoría"}
+                    className="w-full pl-10 pr-10 border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
+                    disabled={!selectedCategory}
+                  />
+                  {selectedSubcategory && (
+                    <button
+                      type="button"
+                      onClick={handleClearSubcategory}
+                      className="absolute right-3 text-gray-400 hover:text-gray-600"
+                    >
+                      <FaTimes />
+                    </button>
+                  )}
+                </div>
+                
+                {/* Dropdown de resultados */}
+                {showSubcategoryDropdown && filteredSubcategories.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {filteredSubcategories.map((subcategory) => (
+                      <div
+                        key={subcategory.id}
+                        onClick={() => handleSelectSubcategory(subcategory)}
+                        className="px-4 py-2 hover:bg-[#18c29c]/10 cursor-pointer border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">{subcategory.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {selectedSubcategory && (
+                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="text-sm text-green-800">
+                      ✓ <strong>{selectedSubcategory.name}</strong>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

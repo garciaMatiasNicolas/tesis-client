@@ -5,9 +5,9 @@ const ProductGrid = ({
     products = [], 
     loading = false, 
     onAddToCart,
-    currentPage,
-    totalPages,
-    onPageChange,
+    hasMore = false,
+    onLoadMore,
+    totalProducts = 0,
     isDarkMode,
     theme 
 }) => {
@@ -73,94 +73,55 @@ const ProductGrid = ({
             ))}
         </div>
 
-        {/* Paginación */}
-        {totalPages > 1 && (
-            <div className="flex justify-center items-center space-x-2 backdrop-blur-sm rounded-lg p-4 border" style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main, backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card}}>
-            {/* Botón anterior */}
-            <button
-                onClick={() => onPageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="px-3 py-2 rounded-md text-sm font-medium transition-all"
-                style={{
-                    backgroundColor: currentPage === 1 
-                        ? (isDarkMode ? theme.background.dark.elevated : theme.background.light.elevated)
-                        : (isDarkMode ? theme.background.dark.card : theme.background.light.card),
-                    color: currentPage === 1
-                        ? (isDarkMode ? theme.text.dark.muted : theme.text.light.muted)
-                        : (isDarkMode ? theme.primary.main : theme.primary.main),
-                    border: currentPage === 1 ? 'none' : `1px solid ${isDarkMode ? theme.border.dark.main : theme.border.light.main}`,
-                    cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-                }}
-            >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-            </button>
-
-            {/* Números de página */}
-            {[...Array(totalPages)].map((_, index) => {
-                const pageNumber = index + 1;
-                const isActive = pageNumber === currentPage;
-                
-                // Mostrar solo páginas relevantes para evitar demasiados números
-                const shouldShow = 
-                pageNumber === 1 || 
-                pageNumber === totalPages || 
-                (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2);
-
-                if (!shouldShow) {
-                // Mostrar puntos suspensivos
-                if (pageNumber === currentPage - 3 || pageNumber === currentPage + 3) {
-                    return (
-                    <span key={pageNumber} className="px-3 py-2 text-gray-500">
-                        ...
-                    </span>
-                    );
-                }
-                return null;
-                }
-
-                return (
+        {/* Botón Cargar más */}
+        {hasMore && (
+            <div className="flex flex-col items-center gap-3 mt-8">
                 <button
-                    key={pageNumber}
-                    onClick={() => onPageChange(pageNumber)}
-                    style={isActive ? { background: theme.primary.gradient } : {}}
-                    className={`
-                    px-3 py-2 rounded-md text-sm font-medium transition-all
-                    ${isActive
-                        ? 'text-white shadow-md transform scale-105'
-                        : 'bg-[#1e1e1e] text-[#9a334d] border border-[#9a334d50] bg-[#9a334d20] hover:bg-[#9a334d30]'
-                    }
-                    `}
+                    onClick={onLoadMore}
+                    disabled={loading}
+                    className="px-8 py-3 rounded-lg font-medium transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg"
+                    style={{
+                        background: loading ? (isDarkMode ? theme.background.dark.elevated : theme.background.light.elevated) : theme.primary.gradient,
+                        color: '#ffffff',
+                    }}
                 >
-                    {pageNumber}
+                    {loading ? (
+                        <span className="flex items-center gap-2">
+                            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Cargando...
+                        </span>
+                    ) : (
+                        'Cargar más productos'
+                    )}
                 </button>
-                );
-            })}
-
-            {/* Botón siguiente */}
-            <button
-                onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className={`
-                px-3 py-2 rounded-md text-sm font-medium transition-all
-                ${currentPage === totalPages
-                    ? 'bg-[#252525] text-gray-500 cursor-not-allowed'
-                    : 'bg-[#1e1e1e] text-[#9a334d] border border-[#9a334d50] bg-[#9a334d20] hover:bg-[#9a334d30]'
-                }
-                `}
-            >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-            </button>
+                
+                {/* Información de resultados */}
+                <p className="text-sm" style={{color: isDarkMode ? theme.text.dark.secondary : theme.text.light.secondary}}>
+                    Mostrando {products.length} de {totalProducts} productos
+                </p>
             </div>
         )}
-
-        {/* Información de resultados */}
-        <div style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className={`text-center mt-4 text-sm backdrop-blur-sm rounded-lg p-2 border border-[${isDarkMode ? theme.border.dark.main : theme.border.light.main}]`}>
-            Mostrando {((currentPage - 1) * 12) + 1} - {Math.min(currentPage * 12, products.length)} de {products.length} productos
-        </div>
+        
+        {/* Mensaje cuando se muestran todos los productos */}
+        {!hasMore && products.length > 0 && (
+            <div className="text-center mt-8">
+                <div className="inline-flex items-center gap-2 px-6 py-3 rounded-lg backdrop-blur-sm border"
+                    style={{
+                        borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main,
+                        backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card,
+                        color: isDarkMode ? theme.text.dark.secondary : theme.text.light.secondary
+                    }}
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-sm font-medium">Has visto todos los productos ({totalProducts})</span>
+                </div>
+            </div>
+        )}
         </div>
     );
 };

@@ -173,7 +173,7 @@ export default function PurchaseOrdersTable({
 
             {/* Estadísticas */}
             {stats && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 w-full">
                     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
                         <div className="flex items-center justify-between">
                             <div>
@@ -339,9 +339,9 @@ export default function PurchaseOrdersTable({
                                                     <div className="flex-shrink-0 h-10 w-10 bg-[#18c29c]/10 rounded-lg flex items-center justify-center">
                                                         <FaTruck className="h-5 w-5 text-[#18c29c]" />
                                                     </div>
-                                                    <div className="ml-4">
+                                                    <div className="ml-4 whitespace-nowrap">
                                                         <div className="text-sm font-medium text-gray-900">
-                                                            {order.supplier?.name || 'N/A'}
+                                                            {(order.supplier?.name.length > 18 ? order.supplier.name.slice(0, 18) + '...' : order.supplier?.name) || 'N/A'}
                                                         </div>
                                                         <div className="text-xs text-gray-500">
                                                             {order.items?.length || 0} items
@@ -349,15 +349,15 @@ export default function PurchaseOrdersTable({
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="text-sm">
                                                     {order.warehouse_destination?.name ? (
                                                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                            Dep: {order.warehouse_destination.name}
+                                                            Dep: {order.warehouse_destination.name.length > 18 ? order.warehouse_destination.name.slice(0, 18) + '...' : order.warehouse_destination.name}
                                                         </span>
                                                     ) : order.branch_destination?.name ? (
                                                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                                            Suc: {order.branch_destination.name}
+                                                            Suc: {order.branch_destination.name.length > 18 ? order.branch_destination.name.slice(0, 18) + '...' : order.branch_destination.name}
                                                         </span>
                                                     ) : (
                                                         <span className="text-xs text-gray-400">Sin destino</span>
@@ -389,7 +389,7 @@ export default function PurchaseOrdersTable({
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm font-semibold text-gray-900">
+                                                <div className="text-sm font-semibold text-gray-900 text-right">
                                                     {formatCurrency(order.total_price)}
                                                 </div>
                                             </td>

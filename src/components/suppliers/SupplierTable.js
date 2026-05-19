@@ -1,8 +1,9 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import { FaBuilding, FaPlus, FaEdit, FaTrash, FaSearch, FaEnvelope, FaPhone, FaGlobe, FaMapMarkerAlt, FaSpinner } from "react-icons/fa";
+import React, { useState, useEffect, useRef } from "react";
+import { FaBuilding, FaPlus, FaEdit, FaTrash, FaSearch, FaEnvelope, FaPhone, FaGlobe, FaMapMarkerAlt, FaSpinner, FaDownload, FaUpload, FaFileExcel } from "react-icons/fa";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
 import SupplierModal from "@/components/suppliers/SupplierModal";
+import useSupplierService from '@/services/supplierService';
 
 export default function SupplierTable({ 
     suppliers = [], 
@@ -13,8 +14,12 @@ export default function SupplierTable({
     onUpdateSupplier,
     searchTerm = "",
     onSearchChange,
-    showActions = true 
+    showActions = true,
+    onReload,
+    onShowAlert
 }) {
+    const supplierService = useSupplierService();
+    const fileInputRef = useRef(null);
     const [filteredSuppliers, setFilteredSuppliers] = useState([]);
     const [countries, setCountries] = useState(["Todos"]);
     const [selectedCountry, setSelectedCountry] = useState("Todos");
@@ -22,6 +27,9 @@ export default function SupplierTable({
     const [isDeleting, setIsDeleting] = useState(false);
     const [supplierModal, setSupplierModal] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState(null);
+    const [importing, setImporting] = useState(false);
+    const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
     // Efecto para filtrar proveedores
     useEffect(() => {
@@ -122,6 +130,109 @@ export default function SupplierTable({
         setSupplierModal(false);
         setEditingSupplier(null);
     };
+    
+    // Descargar plantilla Excel
+    const handleDownloadTemplate = async () => {
+        try {
+            setDownloadingTemplate(true);
+            const blob = await supplierService.exportTemplate();
+            
+            // Validar que sea un Blob
+            if (!blob || !(blob instanceof Blob)) {
+                console.error('Respuesta no es un Blob:', blob);
+                throw new Error('La respuesta del servidor no es válida');
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'plantilla_proveedores.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Error descargando plantilla:', error);
+            if (onShowAlert) {
+                onShowAlert('danger', 'Error al descargar plantilla', 'No se pudo descargar la plantilla Excel. Intenta nuevamente.');
+            }
+        } finally {
+            setDownloadingTemplate(false);
+        }
+    };
+    
+    // Exportar proveedores actuales
+    const handleExport = async () => {
+        try {
+            setExporting(true);
+            const blob = await supplierService.exportData();
+            
+            // Validar que sea un Blob
+            if (!blob || !(blob instanceof Blob)) {
+                console.error('Respuesta no es un Blob:', blob);
+                throw new Error('La respuesta del servidor no es válida');
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'proveedores_export.csv';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Error exportando proveedores:', error);
+            if (onShowAlert) {
+                onShowAlert('danger', 'Error al exportar', 'No se pudieron exportar los proveedores. Intenta nuevamente.');
+            }
+        } finally {
+            setExporting(false);
+        }
+    };
+    
+    // Importar proveedores desde Excel
+    const handleImport = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        
+        try {
+            setImporting(true);
+            const response = await supplierService.importData(file);
+            
+            if (onShowAlert) {
+                const hasErrors = response.errors && response.errors.length > 0;
+                const errorDetails = hasErrors ? `\n\nErrores encontrados:\n${response.errors.join('\n')}` : '';
+                const alertType = hasErrors ? 'warning' : 'success';
+                const alertTitle = hasErrors ? 'Importación con errores' : 'Importación completada';
+                
+                onShowAlert(
+                    alertType, 
+                    alertTitle, 
+                    `Creados: ${response.created}, Actualizados: ${response.updated}${errorDetails}`
+                );
+            }
+            
+            // Recargar lista de proveedores
+            if (onReload) {
+                await onReload();
+            }
+            
+            // Limpiar input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        } catch (error) {
+            console.error('Error importando proveedores:', error);
+            const errorMsg = error.response?.data?.error || 'Error al importar proveedores';
+            
+            if (onShowAlert) {
+                onShowAlert('danger', 'Error al importar', errorMsg);
+            }
+        } finally {
+            setImporting(false);
+        }
+    };
 
     // Loading state
     if (loading) {
@@ -164,13 +275,62 @@ export default function SupplierTable({
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Proveedores</h1>
                     <p className="text-gray-600 mt-1">Gestiona tu red de proveedores</p>
                 </div>
-                <button
-                    onClick={() => setSupplierModal(true)}
-                    className="inline-flex items-center gap-2 bg-[#18c29c] text-white px-4 py-2 rounded-lg hover:bg-[#15a884] transition-colors font-medium shadow-sm"
-                >
-                    <FaPlus className="text-sm" />
-                    Agregar Proveedor
-                </button>
+                <div className="flex items-center gap-2 flex-wrap">
+                    {/* Botones de importación/exportación */}
+                    <button
+                        onClick={handleDownloadTemplate}
+                        disabled={downloadingTemplate}
+                        className="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm disabled:opacity-50"
+                        title="Descargar plantilla Excel"
+                    >
+                        {downloadingTemplate ? (
+                            <><FaSpinner className="mr-2 animate-spin" /> Descargando...</>
+                        ) : (
+                            <><FaFileExcel className="mr-2" /> Plantilla</>
+                        )}
+                    </button>
+                    
+                    <button
+                        onClick={handleExport}
+                        disabled={exporting || suppliers.length === 0}
+                        className="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 text-sm disabled:opacity-50"
+                        title="Exportar datos actuales a CSV"
+                    >
+                        {exporting ? (
+                            <><FaSpinner className="mr-2 animate-spin" /> Exportando...</>
+                        ) : (
+                            <><FaDownload className="mr-2" /> Exportar</>
+                        )}
+                    </button>
+                    
+                    <div className="relative">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".xlsx,.xls"
+                            onChange={handleImport}
+                            className="hidden"
+                            id="supplier-file-input"
+                        />
+                        <label
+                            htmlFor="supplier-file-input"
+                            className={`inline-flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200 cursor-pointer text-sm ${
+                                importing ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                        >
+                            <FaUpload className="mr-2" />
+                            {importing ? 'Importando...' : 'Importar'}
+                        </label>
+                    </div>
+                    
+                    <button
+                        onClick={() => setSupplierModal(true)}
+                        className="inline-flex items-center gap-2 bg-[#18c29c] text-white px-4 py-2 rounded-lg hover:bg-[#15a884] transition-colors font-medium shadow-sm"
+                    >
+                        <FaPlus className="text-sm" />
+                        Agregar Proveedor
+                    </button>
+                </div>
             </div>
 
             {/* Filtros y búsqueda */}
@@ -235,9 +395,6 @@ export default function SupplierTable({
                                 </th>
                                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                                     Ubicación
-                                </th>
-                                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                                    Fecha
                                 </th>
                                 {showActions && (
                                     <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -314,16 +471,6 @@ export default function SupplierTable({
                                                     {supplier.country || 'Sin país'}
                                                 </p>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div>
-                                            <p className="text-sm text-gray-900">
-                                                {formatDate(supplier.created_at)}
-                                            </p>
-                                            <p className="text-xs text-gray-500">
-                                                Actualizado: {formatDate(supplier.updated_at)}
-                                            </p>
                                         </div>
                                     </td>
                                     {showActions && (

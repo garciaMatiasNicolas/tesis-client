@@ -6,9 +6,23 @@ const useProductService = () => {
 
     const productService = {
         // Obtener todos los productos
-        getAllProducts: async () => {
+        getAllProducts: async (filters = {}) => {
             try {
-                const response = await getMethod('/products/');
+                const params = new URLSearchParams();
+                
+                if (filters.page) params.append('page', filters.page);
+                if (filters.page_size) params.append('page_size', filters.page_size);
+                if (filters.search) params.append('search', filters.search);
+                if (filters.category) params.append('category', filters.category);
+                if (filters.status) params.append('status', filters.status);
+                if (filters.supplier) params.append('supplier', filters.supplier);
+                if (filters.all) params.append('all', filters.all);
+                
+                const queryString = params.toString();
+                const url = queryString ? `/products/?${queryString}` : '/products/';
+                
+                const response = await getMethod(url);
+                console.log('Productos obtenidos:', response);
                 return response;
             } catch (error) {
                 console.error('Error al obtener productos:', error);
@@ -158,7 +172,6 @@ const useProductService = () => {
                 const unitsArray = Array.isArray(response) ? response : 
                                   (response && response.results) ? response.results :
                                   (response && response.data) ? response.data : [];
-                console.log('Unidades del producto obtenidas:', unitsArray);
                 return unitsArray;
             } catch (error) {
                 console.error('Error al obtener unidades del producto:', error);
@@ -221,6 +234,43 @@ const useProductService = () => {
             }
         },
 
+        // ============ PRODUCT UNITS IMPORT/EXPORT ============
+        
+        // Exportar plantilla Excel vacía para importación de unidades
+        exportProductUnitsTemplate: async () => {
+            try {
+                const response = await getMethod('/productunits/export_template/', {}, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al exportar plantilla de unidades:', error);
+                throw error;
+            }
+        },
+
+        // Exportar unidades actuales a CSV
+        exportProductUnits: async () => {
+            try {
+                const response = await getMethod('/productunits/export/', {}, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al exportar unidades:', error);
+                throw error;
+            }
+        },
+
+        // Importar unidades desde Excel
+        importProductUnits: async (file) => {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const response = await postMethod('/productunits/import_data/', formData, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al importar unidades:', error);
+                throw error;
+            }
+        },
+
         // Subir imagen de producto
         uploadProductImage: async (productId, imageFile, slot = 'image_1') => {
             try {
@@ -243,6 +293,43 @@ const useProductService = () => {
                 return response;
             } catch (error) {
                 console.error('Error al eliminar imagen:', error);
+                throw error;
+            }
+        },
+
+        // ============ IMPORT/EXPORT ============
+        
+        // Exportar plantilla Excel vacía para importación
+        exportTemplate: async () => {
+            try {
+                const response = await getMethod('/products/export_template/', {}, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al exportar plantilla:', error);
+                throw error;
+            }
+        },
+
+        // Exportar datos actuales a CSV
+        exportData: async () => {
+            try {
+                const response = await getMethod('/products/export/', {}, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al exportar productos:', error);
+                throw error;
+            }
+        },
+
+        // Importar productos desde Excel
+        importData: async (file) => {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const response = await postMethod('/products/import_data/', formData, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al importar productos:', error);
                 throw error;
             }
         }

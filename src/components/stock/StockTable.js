@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
     FaBox, 
     FaSearch, 
@@ -12,40 +12,86 @@ import {
     FaBuilding,
     FaSpinner,
     FaHistory,
-    FaInfoCircle
+    FaInfoCircle,
+    FaDownload,
+    FaFileExcel,
+    FaUpload
 } from "react-icons/fa";
 import StockMovementModal from "./StockMovementModal";
 import useStockService from "@/services/stockService";
+import Pagination from "@/components/ui/Pagination";
 
-export default function StockTable({ 
-    stockData = [], 
-    loading = false, 
-    error = null,
-    searchTerm = "",
-    onSearchChange
-}) {
-    const [filteredStock, setFilteredStock] = useState([]);
+export default function StockTable({ onShowAlert }) {
+    const [stockData, setStockData] = useState([]);
     const [warehouses, setWarehouses] = useState(["Todos"]);
     const [selectedWarehouse, setSelectedWarehouse] = useState("Todos");
     const [stockStatus, setStockStatus] = useState("Todos");
+    const [searchTerm, setSearchTerm] = useState("");
     const [selectedStockForMovements, setSelectedStockForMovements] = useState(null);
     const [isMovementModalOpen, setIsMovementModalOpen] = useState(false);
     const [movements, setMovements] = useState([]);
     const [loadingMovements, setLoadingMovements] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    
+    // Estados de exportación e importación
+    const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+    const [exporting, setExporting] = useState(false);
+    const [importing, setImporting] = useState(false);
+    
+    // Ref para input de archivo
+    const fileInputRef = useRef(null);
+    
+    // Paginación
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const itemsPerPage = 5;
     
     const stockService = useStockService();
 
-    // Efecto para filtrar stock
+    // Resetear a página 1 cuando cambia el término de búsqueda
     useEffect(() => {
-        const validStock = Array.isArray(stockData) ? stockData : [];
-       
-        let filtered = validStock.filter(item => {
-            const matchesSearch = (item.product_detail?.description?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                                 (item.product_detail?.sku?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                                 (item.location_name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                                 (item.warehouse_detail?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                                 (item.branch_detail?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase());
-            
+        setCurrentPage(1);
+    }, [searchTerm]);
+
+    // Cargar stock desde el backend con paginación y búsqueda
+    useEffect(() => {
+        const fetchStockData = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                
+                const filters = {
+                    page: currentPage,
+                    page_size: itemsPerPage
+                };
+                
+                // Agregar búsqueda si existe
+                if (searchTerm) {
+                    filters.search = searchTerm;
+                }
+                
+                const response = await stockService.getAll(filters);
+                
+                // La respuesta viene en formato paginado: { count: X, results: [...], next, previous }
+                setStockData(response.results || []);
+                setTotalCount(response.count || 0);
+            } catch (err) {
+                console.error('Error al cargar datos de stock:', err);
+                setError(err.message || 'Error al cargar la información del stock');
+                setStockData([]);
+                setTotalCount(0);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchStockData();
+    }, [currentPage, itemsPerPage, searchTerm]);
+
+    // Filtrar stock localmente por warehouse y estado (búsqueda se hace en backend)
+    const getFilteredStock = () => {
+        let filtered = stockData.filter(item => {
             const matchesWarehouse = selectedWarehouse === "Todos" || item.location_name === selectedWarehouse;
             
             let matchesStatus = true;
@@ -62,11 +108,28 @@ export default function StockTable({
                 }
             }
             
-            return matchesSearch && matchesWarehouse && matchesStatus;
+            return matchesWarehouse && matchesStatus;
         });
 
-        setFilteredStock(filtered);
-    }, [stockData, searchTerm, selectedWarehouse, stockStatus]);
+        return filtered;
+    };
+
+    // Obtener ubicaciones únicas (de todos los datos de stock, no solo paginados)
+    useEffect(() => {
+        const fetchAllWarehouses = async () => {
+            try {
+                // Obtener todos los stocks sin paginación solo para obtener las ubicaciones
+                const response = await stockService.getAll({ page_size: 1000 });
+                const allStocks = response.results || [];
+                const uniqueWarehouses = [...new Set(allStocks.map(item => item.location_name).filter(Boolean))];
+                setWarehouses(["Todos", ...uniqueWarehouses]);
+            } catch (err) {
+                console.error('Error al cargar ubicaciones:', err);
+            }
+        };
+
+        fetchAllWarehouses();
+    }, []);
 
     // Efecto para obtener Ubicaciones únicos
     useEffect(() => {
@@ -113,6 +176,138 @@ export default function StockTable({
         setSelectedStockForMovements(null);
         setMovements([]);
     };
+
+    // Funciones de paginación
+    const handlePreviousPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        const totalPages = Math.ceil(totalCount / itemsPerPage);
+        if (currentPage < totalPages) {
+            setCurrentPage(currentPage + 1);
+        }
+    };
+
+    const handlePageChange = (pageNumber) => {
+        setCurrentPage(pageNumber);
+    };
+
+    // Exportar stock actual
+    const handleExport = async () => {
+        try {
+            setExporting(true);
+            const blob = await stockService.exportData();
+            
+            // Validar que sea un Blob
+            if (!blob || !(blob instanceof Blob)) {
+                console.error('Respuesta no es un Blob:', blob);
+                throw new Error('La respuesta del servidor no es válida');
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'stock_export.csv';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Error exportando stock:', error);
+            if (onShowAlert) {
+                onShowAlert('danger', 'Error al exportar', 'No se pudo exportar el stock. Intenta nuevamente.');
+            }
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    // Descargar plantilla de ajuste de stock
+    const handleDownloadTemplate = async () => {
+        try {
+            setDownloadingTemplate(true);
+            const blob = await stockService.exportTemplate();
+            
+            // Validar que sea un Blob
+            if (!blob || !(blob instanceof Blob)) {
+                console.error('Respuesta no es un Blob:', blob);
+                throw new Error('La respuesta del servidor no es válida');
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'plantilla_ajuste_stock.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            if (onShowAlert) {
+                onShowAlert('success', 'Plantilla descargada', 'La plantilla se descargó correctamente. Complete las columnas "Nueva Cantidad" y "Motivo".');
+            }
+        } catch (error) {
+            console.error('Error descargando plantilla:', error);
+            if (onShowAlert) {
+                onShowAlert('danger', 'Error al descargar plantilla', 'No se pudo descargar la plantilla. Intenta nuevamente.');
+            }
+        } finally {
+            setDownloadingTemplate(false);
+        }
+    };
+
+    // Importar ajustes de stock
+    const handleImport = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        
+        try {
+            setImporting(true);
+            const response = await stockService.importData(file);
+            
+            if (onShowAlert) {
+                const hasErrors = response.errors && response.errors.length > 0;
+                const errorDetails = hasErrors ? `\n\nErrores encontrados:\n${response.errors.join('\n')}` : '';
+                const alertType = hasErrors ? 'warning' : 'success';
+                const alertTitle = hasErrors ? 'Ajuste con errores' : 'Ajuste completado';
+                
+                onShowAlert(
+                    alertType, 
+                    alertTitle, 
+                    `Ajustes creados: ${response.created}${errorDetails}`
+                );
+            }
+            
+            // Recargar datos de stock
+            const filters = {
+                page: currentPage,
+                page_size: itemsPerPage
+            };
+            const newResponse = await stockService.getAll(filters);
+            setStockData(newResponse.results || []);
+            setTotalCount(newResponse.count || 0);
+            
+            // Limpiar input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        } catch (error) {
+            console.error('Error importando ajustes de stock:', error);
+            const errorMsg = error.response?.data?.error || 'Error al importar ajustes de stock';
+            
+            if (onShowAlert) {
+                onShowAlert('danger', 'Error al importar', errorMsg);
+            }
+        } finally {
+            setImporting(false);
+        }
+    };
+
+    // Obtener stock filtrado para la página actual
+    const filteredStock = getFilteredStock();
 
     // Obtener badge de estado de stock
     const getStockStatusBadge = (currentStock, safetyStock) => {
@@ -180,6 +375,78 @@ export default function StockTable({
                     <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Control de Stock</h1>
                     <p className="text-gray-600 mt-1">Gestiona el inventario y ubicaciones</p>
                 </div>
+                
+                {/* Botones de acciones */}
+                <div className="flex flex-wrap gap-2">
+                    {/* Botón de descargar plantilla */}
+                    <button
+                        onClick={handleDownloadTemplate}
+                        disabled={downloadingTemplate}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white rounded-lg transition-colors font-medium text-sm"
+                        title="Descargar plantilla para ajuste de stock"
+                    >
+                        {downloadingTemplate ? (
+                            <>
+                                <FaSpinner className="animate-spin" />
+                                <span>Descargando...</span>
+                            </>
+                        ) : (
+                            <>
+                                <FaFileExcel />
+                                <span>Plantilla</span>
+                            </>
+                        )}
+                    </button>
+
+                    {/* Botón de exportar CSV */}
+                    <button
+                        onClick={handleExport}
+                        disabled={exporting}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white rounded-lg transition-colors font-medium text-sm"
+                        title="Exportar datos actuales de stock a CSV"
+                    >
+                        {exporting ? (
+                            <>
+                                <FaSpinner className="animate-spin" />
+                                <span>Exportando...</span>
+                            </>
+                        ) : (
+                            <>
+                                <FaDownload />
+                                <span>Exportar</span>
+                            </>
+                        )}
+                    </button>
+
+                    {/* Botón de importar ajustes */}
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={importing}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white rounded-lg transition-colors font-medium text-sm"
+                        title="Importar ajustes de stock desde plantilla"
+                    >
+                        {importing ? (
+                            <>
+                                <FaSpinner className="animate-spin" />
+                                <span>Importando...</span>
+                            </>
+                        ) : (
+                            <>
+                                <FaUpload />
+                                <span>Importar</span>
+                            </>
+                        )}
+                    </button>
+
+                    {/* Input oculto para archivo */}
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={handleImport}
+                        className="hidden"
+                    />
+                </div>
             </div>
 
             {/* Filtros y búsqueda */}
@@ -194,7 +461,8 @@ export default function StockTable({
                                 placeholder="Buscar por producto, SKU, ubicación o proveedor..."
                                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent text-black"
                                 value={searchTerm}
-                                onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+                                autoFocus={true}
+                                onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
                     </div>
@@ -231,7 +499,11 @@ export default function StockTable({
 
                 {/* Resultados */}
                 <div className="mt-4 text-sm text-gray-600">
-                    Mostrando {filteredStock.length} de {Array.isArray(stockData) ? stockData.length : 0} productos
+                    {searchTerm ? (
+                        <>Encontrados {totalCount} productos para "{searchTerm}"</>
+                    ) : (
+                        <>Mostrando {filteredStock.length} de {totalCount} productos en esta página</>
+                    )}
                 </div>
             </div>
 
@@ -294,7 +566,7 @@ export default function StockTable({
                                                     <FaBox className="text-white text-lg" />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="text-sm font-medium text-gray-900 truncate">
+                                                    <p className="text-sm font-medium text-gray-900 truncate ">
                                                         {item.product_detail?.description || 'Sin descripción'}
                                                     </p>
                                                     <p className="text-xs text-gray-500 mt-1">
@@ -326,7 +598,7 @@ export default function StockTable({
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center gap-2">
                                                 <FaWarehouse className="text-gray-400 text-sm" />
                                                 <div>
@@ -352,7 +624,7 @@ export default function StockTable({
                                             <div className="flex items-center gap-2">
                                                 <FaBuilding className="text-gray-400 text-sm" />
                                                 <div>
-                                                    <p className="text-sm text-gray-500">{item.product_detail?.supplier || 'Sin proveedor'}</p>
+                                                    <p className="text-sm text-gray-500 whitespace-nowrap">{(item.product_detail?.supplier.length > 18 ? item.product_detail?.supplier.slice(0, 18) + '...' : item.product_detail?.supplier) || 'Sin proveedor'}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -449,13 +721,27 @@ export default function StockTable({
                         <FaBox className="mx-auto h-12 w-12 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">No hay productos en stock</h3>
                         <p className="mt-1 text-sm text-gray-500">
-                            {searchTerm || selectedWarehouse !== "Todos" || stockStatus !== "Todos"
+                            {searchTerm
+                                ? `No se encontraron productos que coincidan con "${searchTerm}".`
+                                : selectedWarehouse !== "Todos" || stockStatus !== "Todos"
                                 ? "No se encontraron productos con los filtros aplicados."
                                 : "El inventario está vacío."}
                         </p>
                     </div>
                 )}
             </div>
+
+            {/* Paginación */}
+            <Pagination
+                currentPage={currentPage}
+                totalPages={Math.ceil(totalCount / itemsPerPage)}
+                totalCount={totalCount}
+                itemsPerPage={itemsPerPage}
+                onPageChange={handlePageChange}
+                onPreviousPage={handlePreviousPage}
+                onNextPage={handleNextPage}
+                itemName="productos"
+            />
 
             {/* Modal de movimientos */}
             <StockMovementModal

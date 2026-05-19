@@ -630,24 +630,24 @@ export default function PurchaseDetailModal({
                                     {purchase.taxes > 0 && (
                                         <div className="flex justify-between py-2 px-4 bg-gray-50 rounded">
                                             <span className="text-sm text-gray-600">Impuestos</span>
-                                            <span className="text-sm font-medium text-gray-900">{formatCurrency(purchase.taxes)}</span>
+                                            <span className="text-sm font-medium text-gray-900 text-right">{formatCurrency(purchase.taxes)}</span>
                                         </div>
                                     )}
                                     {purchase.discount > 0 && (
                                         <div className="flex justify-between py-2 px-4 bg-gray-50 rounded">
                                             <span className="text-sm text-gray-600">Descuento</span>
-                                            <span className="text-sm font-medium text-red-600">-{formatCurrency(purchase.discount)}</span>
+                                            <span className="text-sm font-medium text-red-600 text-right">-{formatCurrency(purchase.discount)}</span>
                                         </div>
                                     )}
                                     {purchase.shipping_cost > 0 && (
                                         <div className="flex justify-between py-2 px-4 bg-gray-50 rounded">
                                             <span className="text-sm text-gray-600">Costo de Envío</span>
-                                            <span className="text-sm font-medium text-gray-900">{formatCurrency(purchase.shipping_cost)}</span>
+                                            <span className="text-sm font-medium text-gray-900 text-right">{formatCurrency(purchase.shipping_cost)}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between py-3 px-4 bg-[#18c29c]/10 rounded-lg border border-[#18c29c]/20">
                                         <span className="text-base font-semibold text-gray-700">Total</span>
-                                        <span className="text-2xl font-bold text-gray-900">{formatCurrency(purchase.total_price)}</span>
+                                        <span className="text-2xl font-bold text-gray-900 text-right">{formatCurrency(purchase.total_price)}</span>
                                     </div>
                                 </div>
                             </div>

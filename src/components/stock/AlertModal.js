@@ -1,75 +1,49 @@
 "use client";
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { FaCheckCircle, FaExclamationCircle, FaInfoCircle, FaTimes } from 'react-icons/fa';
 
-export default function Alert({ 
+const AlertModal = ({ 
+    isOpen, 
+    onClose, 
     title, 
-    text, 
     message, 
-    type = "success", // success, danger, info, warning
-    onClose,
+    type = "success", // success, error, info
     autoClose = true,
-    autoCloseDelay = 5000
-}) {
-    const [isOpen, setIsOpen] = useState(true);
-    
-    // Usar message o text como contenido
-    const displayText = text || message;
-
+    autoCloseDelay = 3000
+}) => {
     useEffect(() => {
         if (isOpen && autoClose) {
             const timer = setTimeout(() => {
-                handleClose();
+                onClose();
             }, autoCloseDelay);
             
             return () => clearTimeout(timer);
         }
-    }, [isOpen, autoClose, autoCloseDelay]);
-
-    const handleClose = () => {
-        setIsOpen(false);
-        if (onClose) onClose();
-    };
+    }, [isOpen, autoClose, autoCloseDelay, onClose]);
 
     if (!isOpen) return null;
 
-    // Mapear tipos de alert a los mismos estilos
     const typeConfig = {
         success: {
             bg: 'bg-green-50',
             border: 'border-green-200',
             icon: FaCheckCircle,
             iconColor: 'text-green-600',
-            iconBg: 'bg-green-100',
-            titleColor: 'text-green-900',
-            progressBar: 'bg-green-600'
+            titleColor: 'text-green-900'
         },
-        danger: {
+        error: {
             bg: 'bg-red-50',
             border: 'border-red-200',
             icon: FaExclamationCircle,
             iconColor: 'text-red-600',
-            iconBg: 'bg-red-100',
-            titleColor: 'text-red-900',
-            progressBar: 'bg-red-600'
-        },
-        warning: {
-            bg: 'bg-yellow-50',
-            border: 'border-yellow-200',
-            icon: FaExclamationCircle,
-            iconColor: 'text-yellow-600',
-            iconBg: 'bg-yellow-100',
-            titleColor: 'text-yellow-900',
-            progressBar: 'bg-yellow-600'
+            titleColor: 'text-red-900'
         },
         info: {
             bg: 'bg-blue-50',
             border: 'border-blue-200',
             icon: FaInfoCircle,
             iconColor: 'text-blue-600',
-            iconBg: 'bg-blue-100',
-            titleColor: 'text-blue-900',
-            progressBar: 'bg-blue-600'
+            titleColor: 'text-blue-900'
         }
     };
 
@@ -77,11 +51,11 @@ export default function Alert({
     const Icon = config.icon;
 
     return (
-        <div className="fixed inset-0 z-[9999] overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto">
             {/* Backdrop */}
             <div 
-                className="fixed inset-0 bg-black/30 transition-all"
-                onClick={handleClose}
+                className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-all"
+                onClick={onClose}
             />
             
             {/* Alert */}
@@ -89,16 +63,15 @@ export default function Alert({
                 <div className={`relative bg-white rounded-xl shadow-xl max-w-md w-full p-6 border-l-4 ${config.border} transform transition-all animate-slide-down`}>
                     {/* Close button */}
                     <button
-                        onClick={handleClose}
+                        onClick={onClose}
                         className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-                        aria-label="Cerrar"
                     >
                         <FaTimes className="w-4 h-4" />
                     </button>
 
                     {/* Content */}
                     <div className="flex items-start gap-4 pr-8">
-                        <div className={`flex-shrink-0 w-10 h-10 rounded-full ${config.iconBg} flex items-center justify-center`}>
+                        <div className={`flex-shrink-0 w-10 h-10 rounded-full ${config.bg} flex items-center justify-center`}>
                             <Icon className={`w-5 h-5 ${config.iconColor}`} />
                         </div>
                         <div className="flex-1">
@@ -106,7 +79,7 @@ export default function Alert({
                                 {title}
                             </h3>
                             <p className="text-sm text-gray-600">
-                                {displayText}
+                                {message}
                             </p>
                         </div>
                     </div>
@@ -115,7 +88,7 @@ export default function Alert({
                     {autoClose && (
                         <div className="mt-4 h-1 bg-gray-200 rounded-full overflow-hidden">
                             <div 
-                                className={`h-full ${config.progressBar} transition-all`}
+                                className={`h-full ${config.iconColor.replace('text-', 'bg-')} transition-all`}
                                 style={{
                                     animation: `shrink ${autoCloseDelay}ms linear`,
                                     width: '100%'
@@ -153,4 +126,6 @@ export default function Alert({
             `}</style>
         </div>
     );
-}
+};
+
+export default AlertModal;

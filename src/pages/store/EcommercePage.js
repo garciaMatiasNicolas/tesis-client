@@ -32,6 +32,7 @@ const EcommercePage = () => {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalProducts, setTotalProducts] = useState(0);
+    const [pageSize, setPageSize] = useState(8); // Default para pantallas grandes
 
     // Estados para filtros y ordenamiento
     const [filters, setFilters] = useState({
@@ -45,8 +46,9 @@ const EcommercePage = () => {
     const [sortBy, setSortBy] = useState('');
     const [sortOrder, setSortOrder] = useState('asc');
 
-    // Estados para carrito
+    // Estados para carrito y filtros mobile
     const [isCartOpen, setIsCartOpen] = useState(false);
+    const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
     // Función para cargar las categorías, subcategorías y proveedores
     const loadInitialData = () => {
@@ -55,25 +57,55 @@ const EcommercePage = () => {
         getAllSuppliers();
     };
 
+    // Ajustar pageSize según el tamaño de la pantalla
     useEffect(() => {
-      console.log("Cart contents:", cart)
-    }, [cart]);
+        const updatePageSize = () => {
+            const width = window.innerWidth;
+            
+            if (width >= 1280) {
+                // xl: 4 productos por fila → 2 filas = 8 productos
+                setPageSize(8);
+            } else if (width >= 1024) {
+                // lg: 3 productos por fila → 2 filas = 6 productos
+                setPageSize(6);
+            } else if (width >= 640) {
+                // sm: 2 productos por fila → 3 filas = 6 productos
+                setPageSize(6);
+            } else {
+                // móvil: 1 producto por fila → 6 filas = 6 productos
+                setPageSize(6);
+            }
+        };
 
-    const getProducts = useCallback(async (searchFilters = {}) => {
+        // Establecer tamaño inicial
+        updatePageSize();
+
+        // Escuchar cambios en el tamaño de la ventana
+        window.addEventListener('resize', updatePageSize);
+
+        // Cleanup
+        return () => window.removeEventListener('resize', updatePageSize);
+    }, []);
+
+    const getProducts = useCallback(async (searchFilters = {}, loadMore = false, pageToLoad = null) => {
         try {
             setLoading(true);
+            const targetPage = loadMore ? (pageToLoad || currentPage) : 1;
             const apiFilters = {
-                page: currentPage,
-                page_size: 12,
+                page: targetPage,
+                page_size: pageSize,
                 ...searchFilters
             };
 
             // Convertir filtros del frontend al formato de la API
             if (filters.categories.length > 0) {
-                apiFilters.category = filters.categories[0]; // Por ahora solo el primero
+                apiFilters.category = filters.categories.join(','); // Enviar todos separados por coma
             }
             if (filters.subcategories.length > 0) {
-                apiFilters.subcategory = filters.subcategories[0];
+                apiFilters.subcategory = filters.subcategories.join(',');
+            }
+            if (filters.suppliers.length > 0) {
+                apiFilters.supplier = filters.suppliers.join(','); // Enviar todos los proveedores
             }
             if (filters.search) {
                 apiFilters.search = filters.search;
@@ -98,9 +130,19 @@ const EcommercePage = () => {
             
             // La API devuelve datos paginados
             if (data.results) {
-                setProducts(data.results);
+                if (loadMore) {
+                    // Agregar productos al final del array existente, evitando duplicados
+                    setProducts(prev => {
+                        const existingIds = new Set(prev.map(p => p.id));
+                        const newProducts = data.results.filter(p => !existingIds.has(p.id));
+                        return [...prev, ...newProducts];
+                    });
+                } else {
+                    // Reemplazar productos (nueva búsqueda/filtro)
+                    setProducts(data.results);
+                }
                 setTotalProducts(data.count);
-                setTotalPages(Math.ceil(data.count / 12));
+                setTotalPages(Math.ceil(data.count / pageSize));
             } else {
                 setProducts(data);
                 setTotalProducts(data.length);
@@ -111,7 +153,7 @@ const EcommercePage = () => {
             console.error("Error fetching products:", error);
             setLoading(false);
         }
-    }, [getAllProducts, currentPage, filters, sortBy, sortOrder]);
+    }, [getAllProducts, currentPage, filters, sortBy, sortOrder, pageSize]);
 
     const getAllCategories = async () => {
         try {
@@ -147,12 +189,28 @@ const EcommercePage = () => {
         }
     }, [storeActive]);
 
-    // Cargar productos cuando cambien los filtros, ordenamiento o página (solo si la tienda está activa)
+    // Cargar productos cuando cambien los filtros u ordenamiento (solo si la tienda está activa)
     useEffect(() => {
         if (storeActive === true) {
+            setCurrentPage(1);
             getProducts();
         }
-    }, [filters, sortBy, sortOrder, currentPage, storeActive]);
+    }, [filters, sortBy, sortOrder, storeActive]);
+    
+    // Recargar productos cuando cambie el pageSize (tamaño de pantalla)
+    useEffect(() => {
+        if (storeActive === true && pageSize > 0) {
+            setCurrentPage(1);
+            getProducts();
+        }
+    }, [pageSize]);
+    
+    // Función para cargar más productos
+    const loadMoreProducts = () => {
+        const nextPage = currentPage + 1;
+        setCurrentPage(nextPage);
+        getProducts({}, true, nextPage);
+    };
     
     // Handlers
     const handleFiltersChange = (newFilters) => {
@@ -289,8 +347,8 @@ const EcommercePage = () => {
                 {/* Botón de filtros para móvil */}
                 <div className="lg:hidden mb-4">
                 <button
-                    onClick={() => setIsCartOpen(true)} // Placeholder - puedes crear un modal de filtros
-                    className="w-full backdrop-blur-sm rounded-lg p-4 border flex items-center justify-center transition-colors"
+                    onClick={() => setIsFiltersOpen(true)}
+                    className="w-full backdrop-blur-sm rounded-lg p-4 border flex items-center justify-center transition-colors cursor-pointer hover:opacity-80"
                     style={{
                         backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card,
                         borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main,
@@ -303,6 +361,67 @@ const EcommercePage = () => {
                     Filtros y Búsqueda
                 </button>
                 </div>
+
+                {/* Modal de filtros para móvil */}
+                {isFiltersOpen && (
+                    <div className="fixed inset-0 z-50 lg:hidden">
+                        {/* Overlay */}
+                        <div 
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                            onClick={() => setIsFiltersOpen(false)}
+                        />
+                        
+                        {/* Drawer desde la izquierda */}
+                        <div 
+                            className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] overflow-y-auto shadow-2xl"
+                            style={{
+                                backgroundColor: isDarkMode ? theme.background?.dark?.main : theme.background?.light?.main
+                            }}
+                        >
+                            {/* Header del modal */}
+                            <div className="sticky top-0 z-10 p-4 border-b flex items-center justify-between" style={{
+                                backgroundColor: isDarkMode ? theme.background?.dark?.card : theme.background?.light?.card,
+                                borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
+                            }}>
+                                <h2 className="text-lg font-semibold" style={{
+                                    color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                                }}>Filtros y Búsqueda</h2>
+                                <button
+                                    onClick={() => setIsFiltersOpen(false)}
+                                    className="p-2 rounded-lg hover:opacity-80 transition-all cursor-pointer"
+                                    style={{
+                                        color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                                    }}
+                                >
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            </div>
+                            
+                            {/* Contenido de filtros */}
+                            <ProductFilters
+                                categories={categories}
+                                subcategories={subcategories}
+                                suppliers={suppliers}
+                                theme={theme}
+                                isDarkMode={isDarkMode}
+                                onFiltersChange={(newFilters) => {
+                                    handleFiltersChange(newFilters);
+                                }}
+                                onClearFilters={() => setFilters({
+                                    categories: [],
+                                    subcategories: [],
+                                    suppliers: [],
+                                    minPrice: '',
+                                    maxPrice: '',
+                                    search: ''
+                                })}
+                                isMobile={true}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 {/* Ordenamiento */}
                 <ProductSort
@@ -318,10 +437,10 @@ const EcommercePage = () => {
                     products={products}
                     loading={loading}
                     theme={theme}
-                    onAddToCart={!storeConfig?.view_only ? addToCart : null}
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
+                    onAddToCart={addToCart}
+                    hasMore={currentPage < totalPages}
+                    onLoadMore={loadMoreProducts}
+                    totalProducts={totalProducts}
                     viewOnly={storeConfig?.view_only}
                     isDarkMode={isDarkMode}
                 />
@@ -329,17 +448,15 @@ const EcommercePage = () => {
             </div>
         </main>
 
-        {/* Carrito de compras - Solo mostrar si no es view_only */}
-        {!storeConfig?.view_only && (
-            <ShoppingCart
-                isOpen={isCartOpen}
-                onClose={() => setIsCartOpen(false)}
-                cartItems={cart}
-                onUpdateQuantity={updateQuantity}
-                onRemoveItem={removeFromCart}
-                onClearCart={clearCart}
-            />
-        )}
+        {/* Carrito de compras */}
+        <ShoppingCart
+            isOpen={isCartOpen}
+            onClose={() => setIsCartOpen(false)}
+            cartItems={cart}
+            onUpdateQuantity={updateQuantity}
+            onRemoveItem={removeFromCart}
+            onClearCart={clearCart}
+        />
         </div>
     );
 };

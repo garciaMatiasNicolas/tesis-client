@@ -27,6 +27,8 @@ import StockMovementModal from './StockMovementModal';
 import SalesDetailModal from '../admin/SalesDetailModal';
 import PurchaseDetailModal from '../admin/PurchaseDetailModal';
 import CreateInternalMovementModal from './CreateInternalMovementModal';
+import ConfirmationModal from './ConfirmationModal';
+import AlertModal from './AlertModal';
 
 const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
     const [movements, setMovements] = useState([]);
@@ -39,6 +41,9 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
     const [locations, setLocations] = useState(["Todos"]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    
+    // Estado para editar status
+    const [editingStatusId, setEditingStatusId] = useState(null);
     
     // Paginación
     const [currentPage, setCurrentPage] = useState(1);
@@ -54,6 +59,12 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
     const [selectedPurchase, setSelectedPurchase] = useState(null);
     const [loadingModal, setLoadingModal] = useState(false);
     const [isCreateMovementModalOpen, setIsCreateMovementModalOpen] = useState(false);
+    
+    // Modales de confirmación y alertas
+    const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+    const [confirmModalData, setConfirmModalData] = useState(null);
+    const [alertModalOpen, setAlertModalOpen] = useState(false);
+    const [alertModalData, setAlertModalData] = useState({ type: 'success', title: '', message: '' });
     
     const [isInitialized, setIsInitialized] = useState(false);
     
@@ -178,7 +189,7 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
     };
 
     // Obtener badge de estado
-    const getStatusBadge = (statusCode) => {
+    const getStatusBadge = (statusCode, movement = null, isEditable = false) => {
         const statusMap = {
             'PEN': { label: 'Pendiente', color: 'bg-yellow-100 text-yellow-800' },
             'TRAN': { label: 'En Tránsito', color: 'bg-blue-100 text-blue-800' },
@@ -187,6 +198,50 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
         };
 
         const statusInfo = statusMap[statusCode] || { label: statusCode, color: 'bg-gray-100 text-gray-800' };
+
+        // Si es editable (movimiento interno sin venta ni compra)
+        // PERO una vez recibido (REC) o cancelado (CAN), ya no se puede modificar
+        const canEdit = isEditable && movement && !movement.sale && !movement.purchase && statusCode !== 'REC' && statusCode !== 'CAN';
+        
+        if (canEdit) {
+            return (
+                <select
+                    value={statusCode}
+                    onChange={(e) => handleStatusChange(movement.id, e.target.value)}
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.color} border border-transparent hover:border-gray-300 focus:border-[#18c29c] focus:ring-2 focus:ring-[#18c29c] focus:outline-none transition-all cursor-pointer`}
+                    onClick={(e) => e.stopPropagation()}
+                    title="Cambiar estado del movimiento"
+                >
+                    <option value="TRAN">En Tránsito</option>
+                    <option value="REC">Recibido</option>
+                    <option value="CAN">Cancelado</option>
+                </select>
+            );
+        }
+
+        // Si está recibido, mostrar badge con tooltip explicativo
+        if (statusCode === 'REC' && movement && !movement.sale && !movement.purchase) {
+            return (
+                <span 
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.color}`}
+                    title="El estado no puede cambiarse una vez recibido"
+                >
+                    {statusInfo.label}
+                </span>
+            );
+        }
+
+        // Si está cancelado, mostrar badge con tooltip explicativo
+        if (statusCode === 'CAN' && movement && !movement.sale && !movement.purchase) {
+            return (
+                <span 
+                    className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.color}`}
+                    title="El estado no puede cambiarse una vez cancelado"
+                >
+                    {statusInfo.label}
+                </span>
+            );
+        }
 
         return (
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusInfo.color}`}>
@@ -431,6 +486,110 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
         }
     };
 
+    // Función para actualizar el estado de un movimiento interno
+    const handleStatusChange = async (movementId, newStatus) => {
+        const movement = movements.find(m => m.id === movementId);
+        
+        if (!movement) return;
+        
+        // Confirmar si se está cancelando
+        if (newStatus === 'CAN') {
+            // Obtener nombres de ubicaciones
+            const fromLocationName = movement.from_location === 'WHA' 
+                ? movement.warehouse_detail?.name 
+                : movement.branch_detail?.name;
+            const toLocationName = movement.to_location === 'WHA' 
+                ? movement.warehouse_detail?.name 
+                : movement.branch_detail?.name;
+            
+            setConfirmModalData({
+                movementId,
+                newStatus,
+                movement,
+                fromLocationName,
+                toLocationName
+            });
+            setConfirmModalOpen(true);
+            return;
+        }
+        
+        // Para otros cambios de estado, ejecutar directamente
+        await executeStatusChange(movementId, newStatus);
+    };
+
+    // Función que ejecuta el cambio de estado
+    const executeStatusChange = async (movementId, newStatus) => {
+        try {
+            await stockService.updateMovementStatus(movementId, newStatus);
+            
+            // Actualizar localmente el movimiento
+            setMovements(prevMovements => 
+                prevMovements.map(mov => 
+                    mov.id === movementId ? { ...mov, status: newStatus } : mov
+                )
+            );
+            
+            // Mostrar mensaje de éxito según el nuevo estado
+            const successMessages = {
+                'PEN': {
+                    title: 'Estado actualizado',
+                    message: 'Movimiento marcado como pendiente'
+                },
+                'TRAN': {
+                    title: 'En tránsito',
+                    message: 'Movimiento marcado en tránsito'
+                },
+                'REC': {
+                    title: 'Recibido',
+                    message: 'Movimiento recibido correctamente. El estado queda bloqueado y no podrá modificarse.'
+                },
+                'CAN': {
+                    title: 'Movimiento cancelado',
+                    message: 'El movimiento fue cancelado y el stock se ha revertido correctamente'
+                }
+            };
+            
+            const successData = successMessages[newStatus] || { 
+                title: 'Éxito', 
+                message: 'Estado actualizado correctamente' 
+            };
+            
+            setAlertModalData({
+                type: 'success',
+                title: successData.title,
+                message: successData.message
+            });
+            setAlertModalOpen(true);
+            
+        } catch (error) {
+            console.error('Error al actualizar estado:', error);
+            
+            // Mostrar mensaje de error específico
+            const errorMessage = error.response?.data?.error || 
+                                error.message || 
+                                'No se pudo actualizar el estado del movimiento';
+            
+            setAlertModalData({
+                type: 'error',
+                title: 'Error al actualizar estado',
+                message: errorMessage
+            });
+            setAlertModalOpen(true);
+            
+            // Recargar para volver al estado anterior
+            handleMovementCreated();
+        }
+    };
+
+    // Función para confirmar la cancelación del movimiento
+    const handleConfirmCancel = async () => {
+        if (confirmModalData) {
+            setConfirmModalOpen(false);
+            await executeStatusChange(confirmModalData.movementId, confirmModalData.newStatus);
+            setConfirmModalData(null);
+        }
+    };
+
     // Loading state
     if (loading) {
         return (
@@ -532,7 +691,6 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
                                 }}
                             >
                                 <option value="Todos">Todos los estados</option>
-                                <option value="PEN">Pendiente</option>
                                 <option value="TRAN">En Tránsito</option>
                                 <option value="REC">Recibido</option>
                                 <option value="CAN">Cancelado</option>
@@ -657,10 +815,10 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         {formatDate(movement.date)}
                                     </td>
-                                    <td className="px-6 py-4">
+                                    <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex flex-col">
                                             <span className="text-sm font-medium text-gray-900">
-                                                {movement.product_detail?.description || '-'}
+                                                {(movement.product_detail?.description || '-').length > 18 ? (movement.product_detail?.description || '-').slice(0, 18) + '...' : (movement.product_detail?.description || '-')}
                                             </span>
                                             <span className="text-xs text-gray-500">
                                                 SKU: {movement.product_detail?.sku || '-'}
@@ -677,8 +835,8 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
                                         {renderLocationWithOrder(movement.to_location, movement)}
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="text-sm text-gray-900">
-                                            {movement.warehouse_detail?.name || movement.branch_detail?.name || '-'}
+                                        <div className="text-sm text-gray-900 whitespace-nowrap">
+                                            {(movement.warehouse_detail?.name.length > 18 ? movement.warehouse_detail?.name.slice(0, 18) + '...' : movement.warehouse_detail?.name) || (movement.branch_detail?.name.length > 18 ? movement.branch_detail?.name.slice(0, 18) + '...' : movement.branch_detail?.name) || '-'}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -687,7 +845,7 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        {getStatusBadge(movement.status)}
+                                        {getStatusBadge(movement.status, movement, true)}
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex flex-col gap-2">
@@ -699,7 +857,7 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
                                                 style={{cursor: "pointer"}}
                                             >
                                                 <FaEye className="w-3 h-3" />
-                                                <span>Ver Movimiento</span>
+                                                <span className='whitespace-nowrap'>Ver Movimiento</span>
                                             </button>
                                         </div>
                                     </td>
@@ -758,7 +916,7 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
 
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-600">Estado:</span>
-                                        {getStatusBadge(movement.status)}
+                                        {getStatusBadge(movement.status, movement, true)}
                                     </div>
 
                                     {/* Botones de referencia */}
@@ -953,6 +1111,37 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
                 isOpen={isCreateMovementModalOpen}
                 onClose={() => setIsCreateMovementModalOpen(false)}
                 onSuccess={handleMovementCreated}
+            />
+
+            {/* Modal de confirmación para cancelar movimiento */}
+            <ConfirmationModal
+                isOpen={confirmModalOpen}
+                onClose={() => {
+                    setConfirmModalOpen(false);
+                    setConfirmModalData(null);
+                }}
+                onConfirm={handleConfirmCancel}
+                title="¿Cancelar movimiento de stock?"
+                message="Esta acción revertirá los cambios de stock realizados. ¿Está seguro de que desea continuar?"
+                details={confirmModalData ? [
+                    `Se devolverán ${confirmModalData.movement?.quantity || 0} unidades de ${confirmModalData.movement?.product_detail?.description || 'producto'} al origen`,
+                    `Origen: ${confirmModalData.fromLocationName || 'ubicación'}`,
+                    `Destino: ${confirmModalData.toLocationName || 'ubicación'}`
+                ] : []}
+                confirmText="Sí, cancelar movimiento"
+                cancelText="No, mantener"
+                type="danger"
+            />
+
+            {/* Modal de alerta para mensajes de éxito/error */}
+            <AlertModal
+                isOpen={alertModalOpen}
+                onClose={() => setAlertModalOpen(false)}
+                title={alertModalData.title}
+                message={alertModalData.message}
+                type={alertModalData.type}
+                autoClose={true}
+                autoCloseDelay={4000}
             />
         </div>
     );

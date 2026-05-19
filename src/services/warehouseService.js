@@ -88,7 +88,43 @@ const useWarehouseService = () => {
                 console.error('Error al obtener stock del depósito:', error);
                 throw error;
             }
-        }
+        },
+
+        // Exportar plantilla Excel vacía
+        exportTemplate: async () => {
+            try {
+                const response = await getMethod('/warehouses/export_template/', {}, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al exportar plantilla:', error);
+                throw error;
+            }
+        },
+
+        // Exportar todos los depósitos a Excel
+        exportData: async () => {
+            try {
+                const response = await getMethod('/warehouses/export/', {}, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al exportar depósitos:', error);
+                throw error;
+            }
+        },
+
+        // Importar depósitos desde Excel
+        importData: async (file) => {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const response = await postMethod('/warehouses/import_data/', formData, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al importar depósitos:', error);
+                throw error;
+            }
+        },
     };
 
     return warehouseService;

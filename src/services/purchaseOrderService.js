@@ -26,7 +26,6 @@ class PurchaseOrderService {
         
         try {
             const response = await this.apiMethods.getMethod('/billing/purchase-orders/', params);
-            console.log('Purchase orders response:', response);
             return response;
         } catch (error) {
             console.error('Error fetching purchase orders:', error);
@@ -62,7 +61,6 @@ class PurchaseOrderService {
         try {
             // Transformar datos del formulario al formato esperado por la API
             const transformedData = this.transformFormDataToApi(purchaseData);
-            console.log('Transformed data for creating purchase order:', transformedData);
             const response = await this.apiMethods.postMethod('/billing/purchase-orders/', transformedData);
             return response;
         } catch (error) {

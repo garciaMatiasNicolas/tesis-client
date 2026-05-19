@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
-import { FaPlus, FaBuilding, FaTrash, FaMapMarkerAlt, FaUser, FaSave, FaEdit, FaTimes, FaCheck } from "react-icons/fa";
+import { useState, useEffect } from "react";
+import { FaPlus, FaBuilding, FaTrash, FaMapMarkerAlt, FaUser, FaSave, FaEdit, FaTimes, FaCheck, FaSpinner, FaSearch } from "react-icons/fa";
+import georefService from "@/services/georefService";
 
 const BranchesForm = ({ 
     branches = [], 
@@ -16,11 +17,119 @@ const BranchesForm = ({
 }) => {
     const [editingBranches, setEditingBranches] = useState(new Set());
     const [validationErrors, setValidationErrors] = useState({});
+    const [fieldErrors, setFieldErrors] = useState({}); // Errores de campos individuales
     const [disabled, setDisabled] = useState(false);
+    
+    // Estados para Georef API (por sucursal)
+    const [provincias, setProvincias] = useState([]);
+    const [ciudadesPorBranch, setCiudadesPorBranch] = useState({}); // { branchId: [ciudades] }
+    const [loadingProvincias, setLoadingProvincias] = useState(false);
+    const [loadingCiudades, setLoadingCiudades] = useState({});  // { branchId: boolean }
+    const [selectedProvinciaId, setSelectedProvinciaId] = useState({}); // { branchId: provinciaId }
+    const [citySearchTerm, setCitySearchTerm] = useState({}); // { branchId: searchTerm }
+    const [showCityDropdown, setShowCityDropdown] = useState({}); // { branchId: boolean }
     
     const canEdit = ["superadmin", "manager"].includes(userRole);
     const canDelete = ["superadmin"].includes(userRole);
     const canAdd = ["superadmin"].includes(userRole);
+
+    // Cargar provincias al montar el componente
+    useEffect(() => {
+        loadProvincias();
+    }, []);
+
+    // Cargar provincias desde la API de Georef
+    const loadProvincias = async () => {
+        try {
+            setLoadingProvincias(true);
+            const data = await georefService.getProvincias();
+            setProvincias(data);
+        } catch (error) {
+            console.error('Error loading provincias:', error);
+        } finally {
+            setLoadingProvincias(false);
+        }
+    };
+
+    // Cargar ciudades cuando se selecciona una provincia
+    const loadCiudades = async (branchId, provinciaId, provinciaNombre) => {
+        try {
+            setLoadingCiudades(prev => ({ ...prev, [branchId]: true }));
+            setCiudadesPorBranch(prev => ({ ...prev, [branchId]: [] }));
+            const data = await georefService.getLocalidades(provinciaId, provinciaNombre);
+            setCiudadesPorBranch(prev => ({ ...prev, [branchId]: data }));
+        } catch (error) {
+            console.error('Error loading ciudades:', error);
+        } finally {
+            setLoadingCiudades(prev => ({ ...prev, [branchId]: false }));
+        }
+    };
+
+    // Manejar búsqueda de ciudades
+    const handleCitySearch = async (branchId, searchTerm, provinciaId) => {
+        setCitySearchTerm(prev => ({ ...prev, [branchId]: searchTerm }));
+        
+        if (searchTerm.length >= 2 && provinciaId) {
+            try {
+                setLoadingCiudades(prev => ({ ...prev, [branchId]: true }));
+                const data = await georefService.searchLocalidades(searchTerm, provinciaId);
+                setCiudadesPorBranch(prev => ({ ...prev, [branchId]: data }));
+                setShowCityDropdown(prev => ({ ...prev, [branchId]: true }));
+            } catch (error) {
+                console.error('Error searching ciudades:', error);
+            } finally {
+                setLoadingCiudades(prev => ({ ...prev, [branchId]: false }));
+            }
+        } else if (searchTerm.length === 0 && provinciaId) {
+            const provincia = provincias.find(p => p.id === provinciaId);
+            if (provincia) {
+                loadCiudades(branchId, provinciaId, provincia.nombre);
+            }
+        }
+    };
+
+    // Seleccionar ciudad del dropdown
+    const selectCity = (branchId, idx, branch, cityName) => {
+        onChange(idx, { ...branch, city: cityName });
+        setCitySearchTerm(prev => ({ ...prev, [branchId]: cityName }));
+        setShowCityDropdown(prev => ({ ...prev, [branchId]: false }));
+    };
+
+    // Manejar cambio de provincia
+    const handleProvinciaChange = (branchId, idx, branch, selectedId) => {
+        const provincia = provincias.find(p => p.id === selectedId);
+        
+        if (provincia) {
+            setSelectedProvinciaId(prev => ({ ...prev, [branchId]: selectedId }));
+            onChange(idx, { ...branch, state: provincia.nombre, city: '', country: 'Argentina' });
+            setCitySearchTerm(prev => ({ ...prev, [branchId]: '' }));
+            loadCiudades(branchId, selectedId, provincia.nombre);
+        }
+    };
+
+    // Manejar cambio de país
+    const handleCountryChange = (branchId, idx, branch, value) => {
+        onChange(idx, { ...branch, country: value, state: '', city: '' });
+        setSelectedProvinciaId(prev => ({ ...prev, [branchId]: null }));
+        setCiudadesPorBranch(prev => ({ ...prev, [branchId]: [] }));
+        setCitySearchTerm(prev => ({ ...prev, [branchId]: '' }));
+    };
+
+    // Inicializar estados de georef cuando se comienza a editar una sucursal con datos de Argentina
+    useEffect(() => {
+        branches.forEach(branch => {
+            if (branch.country === 'Argentina' && branch.state && !selectedProvinciaId[branch.id]) {
+                const provincia = provincias.find(p => p.nombre === branch.state);
+                if (provincia) {
+                    setSelectedProvinciaId(prev => ({ ...prev, [branch.id]: provincia.id }));
+                    loadCiudades(branch.id, provincia.id, provincia.nombre);
+                }
+            }
+            if (branch.city && !citySearchTerm[branch.id]) {
+                setCitySearchTerm(prev => ({ ...prev, [branch.id]: branch.city }));
+            }
+        });
+    }, [branches, provincias]);
 
     // Función para verificar si el usuario puede editar una sucursal específica
     const canEditBranch = (branch, user) => {
@@ -49,14 +158,61 @@ const BranchesForm = ({
         setEditingBranches(newEditingBranches);
         setDisabled(false);
         setValidationErrors({});
+        // Limpiar errores de campos para esta sucursal
+        const newFieldErrors = { ...fieldErrors };
+        delete newFieldErrors[branchId];
+        setFieldErrors(newFieldErrors);
+    };
+
+    // Validar todos los campos obligatorios de una sucursal
+    const validateBranch = (branch) => {
+        const errors = {};
+        
+        if (!branch.name || !branch.name.trim()) {
+            errors.name = 'El nombre de la sucursal es obligatorio';
+        }
+        if (!branch.manager) {
+            errors.manager = 'El manager es obligatorio';
+        }
+        if (!branch.country || !branch.country.trim()) {
+            errors.country = 'El país es obligatorio';
+        }
+        if (!branch.state || !branch.state.trim()) {
+            errors.state = 'La provincia/estado es obligatoria';
+        }
+        if (!branch.city || !branch.city.trim()) {
+            errors.city = 'La ciudad es obligatoria';
+        }
+        if (!branch.postal_code || !branch.postal_code.trim()) {
+            errors.postal_code = 'El código postal es obligatorio';
+        }
+        if (!branch.address || !branch.address.trim()) {
+            errors.address = 'La dirección es obligatoria';
+        }
+        
+        return errors;
     };
 
     const confirmChanges = async (branch) => {
-        // Validar antes de guardar
+        // Validar campos obligatorios
+        const errors = validateBranch(branch);
+        
+        if (Object.keys(errors).length > 0) {
+            setFieldErrors(prev => ({ ...prev, [branch.id]: errors }));
+            setDisabled(true);
+            return;
+        }
+        
+        // Validar antes de guardar (validaciones de negocio)
         if (validationErrors[branch.id]) {
             setDisabled(true);
             return;
         }
+        
+        // Limpiar errores de campos
+        const newFieldErrors = { ...fieldErrors };
+        delete newFieldErrors[branch.id];
+        setFieldErrors(newFieldErrors);
         
         await onSave(branch);
         cancelEditing(branch.id);
@@ -188,11 +344,11 @@ const BranchesForm = ({
                                 {/* Nombre de la sucursal */}
                                 <div className="md:col-span-2 lg:col-span-1">
                                     <label className="block text-sm font-semibold text-[#223263] mb-2">
-                                        Nombre de la sucursal
+                                        Nombre de la sucursal <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
-                                            isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100'
+                                            fieldErrors[branch.id]?.name ? 'border-red-500 bg-red-50' : (isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100')
                                         }`}
                                         value={branch.name || ''}
                                         onChange={e => {
@@ -219,19 +375,24 @@ const BranchesForm = ({
                                         placeholder="Sucursal Centro"
                                         readOnly={!isEditingBranch}
                                     />
+                                    {fieldErrors[branch.id]?.name && (
+                                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                            <span>⚠</span> {fieldErrors[branch.id].name}
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Manager */}
                                 <div className="lg:col-span-1">
                                     <label className="block text-sm font-semibold text-[#223263] mb-2">
-                                        Manager
+                                        Manager <span className="text-red-500">*</span>
                                         {branch.name && branch.name.endsWith("- Sucursal Principal") && (
                                             <span className="text-xs text-blue-600 ml-2">(Solo propietario)</span>
                                         )}
                                     </label>
                                     <select
                                         className={`disabled:cursor-not-allowed w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
-                                            isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100'
+                                            fieldErrors[branch.id]?.manager ? 'border-red-500 bg-red-50' : (isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100')
                                         }`}
                                         value={branch.manager || ''}
                                         onChange={e => {
@@ -284,6 +445,13 @@ const BranchesForm = ({
                                         </p>
                                     )}
                                     
+                                    {/* Mostrar error de campo obligatorio */}
+                                    {fieldErrors[branch.id]?.manager && (
+                                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                            <span>⚠</span> {fieldErrors[branch.id].manager}
+                                        </p>
+                                    )}
+                                    
                                     {/* Mostrar nombre del manager actual si no está en modo edición */}
                                     {!isEditingBranch && branch.manager_name && (
                                         <p className="text-sm text-gray-500 mt-1">
@@ -299,72 +467,182 @@ const BranchesForm = ({
 
                                 {/* País */}
                                 <div>
-                                    <label className="block text-sm font-semibold text-[#223263] mb-2">País</label>
-                                    <input
+                                    <label className="block text-sm font-semibold text-[#223263] mb-2">País <span className="text-red-500">*</span></label>
+                                    <select
                                         className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
-                                            isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100'
+                                            fieldErrors[branch.id]?.country ? 'border-red-500 bg-red-50' : (isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100')
                                         }`}
                                         value={branch.country || ''}
-                                        onChange={e => isEditingBranch && onChange(idx, { ...branch, country: e.target.value })}
-                                        placeholder="Argentina"
-                                        readOnly={!isEditingBranch}
-                                    />
+                                        onChange={e => isEditingBranch && handleCountryChange(branch.id, idx, branch, e.target.value)}
+                                        disabled={!isEditingBranch}
+                                    >
+                                        <option value="">Seleccione un país</option>
+                                        <option value="Argentina">Argentina</option>
+                                        <option value="Brasil">Brasil</option>
+                                        <option value="Chile">Chile</option>
+                                        <option value="Uruguay">Uruguay</option>
+                                        <option value="Paraguay">Paraguay</option>
+                                        <option value="Otro">Otro</option>
+                                    </select>
+                                    {fieldErrors[branch.id]?.country && (
+                                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                            <span>⚠</span> {fieldErrors[branch.id].country}
+                                        </p>
+                                    )}
                                 </div>
                                 
                                 {/* Estado/Provincia */}
                                 <div>
-                                    <label className="block text-sm font-semibold text-[#223263] mb-2">Estado/Provincia</label>
-                                    <input
-                                        className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
-                                            isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100'
-                                        }`}
-                                        value={branch.state || ''}
-                                        onChange={e => isEditingBranch && onChange(idx, { ...branch, state: e.target.value })}
-                                        placeholder="Buenos Aires"
-                                        readOnly={!isEditingBranch}
-                                    />
+                                    <label className="block text-sm font-semibold text-[#223263] mb-2">
+                                        Estado/Provincia <span className="text-red-500">*</span>
+                                        {branch.country === 'Argentina' && loadingProvincias && (
+                                            <FaSpinner className="inline ml-2 animate-spin text-gray-400 text-xs" />
+                                        )}
+                                    </label>
+                                    {branch.country === 'Argentina' ? (
+                                        <select
+                                            className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
+                                                fieldErrors[branch.id]?.state ? 'border-red-500 bg-red-50' : (isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100')
+                                            }`}
+                                            value={selectedProvinciaId[branch.id] || ''}
+                                            onChange={e => isEditingBranch && handleProvinciaChange(branch.id, idx, branch, e.target.value)}
+                                            disabled={!isEditingBranch || loadingProvincias}
+                                        >
+                                            <option value="">Seleccione una provincia</option>
+                                            {provincias.map(provincia => (
+                                                <option key={provincia.id} value={provincia.id}>
+                                                    {provincia.nombre}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
+                                                fieldErrors[branch.id]?.state ? 'border-red-500 bg-red-50' : (isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100')
+                                            }`}
+                                            value={branch.state || ''}
+                                            onChange={e => isEditingBranch && onChange(idx, { ...branch, state: e.target.value })}
+                                            placeholder="Buenos Aires"
+                                            readOnly={!isEditingBranch}
+                                        />
+                                    )}
+                                    {fieldErrors[branch.id]?.state && (
+                                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                            <span>⚠</span> {fieldErrors[branch.id].state}
+                                        </p>
+                                    )}
                                 </div>
 
-                                {/* Código postal */}
+                               {/* Código postal */}
                                 <div>
-                                    <label className="block text-sm font-semibold text-[#223263] mb-2">Código Postal</label>
+                                    <label className="block text-sm font-semibold text-[#223263] mb-2">Código Postal <span className="text-red-500">*</span></label>
                                     <input
                                         className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
-                                            isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100'
+                                            fieldErrors[branch.id]?.postal_code ? 'border-red-500 bg-red-50' : (isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100')
                                         }`}
                                         value={branch.postal_code || ''}
                                         onChange={e => isEditingBranch && onChange(idx, { ...branch, postal_code: e.target.value })}
                                         placeholder="1000"
                                         readOnly={!isEditingBranch}
                                     />
+                                    {fieldErrors[branch.id]?.postal_code && (
+                                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                            <span>⚠</span> {fieldErrors[branch.id].postal_code}
+                                        </p>
+                                    )}
                                 </div>
                                 
                                 {/* Ciudad */}
-                                <div>
-                                    <label className="block text-sm font-semibold text-[#223263] mb-2">Ciudad</label>
-                                    <input
-                                        className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
-                                            isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100'
-                                        }`}
-                                        value={branch.city || ''}
-                                        onChange={e => isEditingBranch && onChange(idx, { ...branch, city: e.target.value })}
-                                        placeholder="Buenos Aires"
-                                        readOnly={!isEditingBranch}
-                                    />
+                                <div className="relative">
+                                    <label className="block text-sm font-semibold text-[#223263] mb-2">
+                                        Ciudad <span className="text-red-500">*</span>
+                                        {branch.country === 'Argentina' && loadingCiudades[branch.id] && (
+                                            <FaSpinner className="inline ml-2 animate-spin text-gray-400 text-xs" />
+                                        )}
+                                    </label>
+                                    {branch.country === 'Argentina' ? (
+                                        <>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    value={citySearchTerm[branch.id] || branch.city || ''}
+                                                    onChange={(e) => {
+                                                        if (!isEditingBranch) return;
+                                                        handleCitySearch(branch.id, e.target.value, selectedProvinciaId[branch.id]);
+                                                        onChange(idx, { ...branch, city: e.target.value });
+                                                    }}
+                                                    onFocus={() => {
+                                                        if (ciudadesPorBranch[branch.id]?.length > 0) {
+                                                            setShowCityDropdown(prev => ({ ...prev, [branch.id]: true }));
+                                                        }
+                                                    }}
+                                                    className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
+                                                        fieldErrors[branch.id]?.city ? 'border-red-500 bg-red-50' : (isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100')
+                                                    }`}
+                                                    placeholder={selectedProvinciaId[branch.id] ? "Buscar ciudad..." : "Primero seleccione provincia"}
+                                                    disabled={!selectedProvinciaId[branch.id] || !isEditingBranch}
+                                                    readOnly={!isEditingBranch}
+                                                />
+                                                {isEditingBranch && <FaSearch className="absolute right-4 top-4 text-gray-400 text-sm" />}
+                                            </div>
+                                            
+                                            {/* Dropdown de ciudades */}
+                                            {isEditingBranch && showCityDropdown[branch.id] && ciudadesPorBranch[branch.id]?.length > 0 && (
+                                                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                    {ciudadesPorBranch[branch.id].map((ciudad) => (
+                                                        <button
+                                                            key={ciudad.id}
+                                                            type="button"
+                                                            onClick={() => selectCity(branch.id, idx, branch, ciudad.nombre)}
+                                                            className="w-full text-left px-4 py-2 hover:bg-gray-100 text-sm text-gray-900 transition-colors"
+                                                        >
+                                                            {ciudad.nombre}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            
+                                            {isEditingBranch && selectedProvinciaId[branch.id] && !ciudadesPorBranch[branch.id]?.length && !loadingCiudades[branch.id] && (
+                                                <p className="mt-1 text-xs text-gray-500">
+                                                    Escriba al menos 2 letras para buscar
+                                                </p>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <input
+                                            className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
+                                                fieldErrors[branch.id]?.city ? 'border-red-500 bg-red-50' : (isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100')
+                                            }`}
+                                            value={branch.city || ''}
+                                            onChange={e => isEditingBranch && onChange(idx, { ...branch, city: e.target.value })}
+                                            placeholder="Buenos Aires"
+                                            readOnly={!isEditingBranch}
+                                        />
+                                    )}
+                                    {fieldErrors[branch.id]?.city && (
+                                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                            <span>⚠</span> {fieldErrors[branch.id].city}
+                                        </p>
+                                    )}
                                 </div>
                                 
                                 {/* Dirección */}
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-semibold text-[#223263] mb-2">Dirección</label>
+                                    <label className="block text-sm font-semibold text-[#223263] mb-2">Dirección <span className="text-red-500">*</span></label>
                                     <input
                                         className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#18c29c] text-gray-600 ${
-                                            isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100'
+                                            fieldErrors[branch.id]?.address ? 'border-red-500 bg-red-50' : (isEditingBranch ? 'border-gray-300 bg-white' : 'border-gray-200 bg-gray-100')
                                         }`}
                                         value={branch.address || ''}
                                         onChange={e => isEditingBranch && onChange(idx, { ...branch, address: e.target.value })}
                                         placeholder="Av. Corrientes 1234"
                                         readOnly={!isEditingBranch}
                                     />
+                                    {fieldErrors[branch.id]?.address && (
+                                        <p className="text-red-500 text-xs mt-1 flex items-center gap-1">
+                                            <span>⚠</span> {fieldErrors[branch.id].address}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
@@ -377,7 +655,7 @@ const BranchesForm = ({
                                             loading ? 'opacity-50 cursor-not-allowed' : ''
                                         }`}
                                         onClick={() => confirmChanges(branch)}
-                                        disabled={loading || disabled || validationErrors[branch.id]}
+                                        disabled={loading || disabled || validationErrors[branch.id] || (fieldErrors[branch.id] && Object.keys(fieldErrors[branch.id]).length > 0)}
                                     >
                                         {loading ? (
                                             <>

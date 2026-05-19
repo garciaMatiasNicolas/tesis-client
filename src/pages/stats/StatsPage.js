@@ -170,10 +170,6 @@ const StatsPage = () => {
                     />
                 </div>
 
-                {/* Sales Chart */}
-                <div className="mb-8">
-                    <SalesChart />
-                </div>
 
                 {/* Tables Grid */}
                 <div className=" mb-8">
@@ -271,6 +267,10 @@ const StatsPage = () => {
                             </div>
                         </div>
                     </div>
+                </div>
+                {/* Sales Chart */}
+                <div className="mb-8">
+                    <SalesChart />
                 </div>
             </main>
         </div>

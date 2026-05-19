@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaSpinner, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaPlus, FaTrash, FaTimes, FaSpinner, FaSearch } from 'react-icons/fa';
 import useProductService from '@/services/productService';
 import useEcommerceService from '@/services/ecommerceService';
 import useWarehouseService from '@/services/warehouseService';
@@ -41,6 +41,9 @@ export default function PurchaseFormModal({
     const [branches, setBranches] = useState([]);
     const [loadingData, setLoadingData] = useState(true);
     const [productUnits, setProductUnits] = useState({}); // { productId: [units] }
+    
+    // Estados para búsqueda de productos
+    const [productSearches, setProductSearches] = useState({}); // { itemIndex: { search: '', filtered: [], showDropdown: false } }
 
     // Servicios
     const { getAllProducts, getProductUnits } = useProductService();
@@ -57,30 +60,32 @@ export default function PurchaseFormModal({
 
     // Filtrar productos cuando cambia el proveedor seleccionado
     useEffect(() => {
-        if (formData.supplier) {
-            // Filtrar productos por proveedor
-            const filtered = products.filter(product => 
-                product.supplier === formData.supplier.id
-            );
-            setFilteredProducts(filtered);
-        } else {
-            // Si no hay proveedor seleccionado, mostrar todos los productos
-            setFilteredProducts(products);
-        }
-    }, [formData.supplier, products]);
+        const filterProductsBySupplier = async () => {
+            if (formData.supplier) {
+                const productsData = await getAllProducts({supplier: formData.supplier.id, all: true});
+                const filtered = Array.isArray(productsData) ? productsData.filter(product => product.status !== "discontinued") : [];
+                setProducts(filtered);
+                setFilteredProducts(filtered);
+            } else {
+                // Si no hay proveedor seleccionado, mostrar array vacío
+                setFilteredProducts([]);
+            }
+        };
+        filterProductsBySupplier();
+        console.log('Proveedor seleccionado:', formData.supplier);
+        console.log('Productos filtrados:', filteredProducts);
+    }, [formData.supplier]);
 
     const loadInitialData = async () => {
         try {
             setLoadingData(true);
-            const [suppliersData, productsData, warehousesData, branchesData] = await Promise.all([
+            const [suppliersData, warehousesData, branchesData] = await Promise.all([
                 getSuppliers(),
-                getAllProducts(),
                 getAllWarehouses(),
                 getAllBranches()
             ]);
             
             setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
-            setProducts(Array.isArray(productsData) ? productsData.filter(product => product.status !== "discontinued") : []);
             setWarehouses(Array.isArray(warehousesData) ? warehousesData : []);
             setBranches(Array.isArray(branchesData) ? branchesData : []);
         } catch (error) {
@@ -112,6 +117,19 @@ export default function PurchaseFormModal({
             };
             loadUnitsForProducts();
             
+            const items = (purchaseOrder.items || []).map(item => {
+                // Buscar el producto completo del array de productos
+                const productId = item.product?.id || item.product;
+                const fullProduct = products.find(p => p.id === productId);
+                
+                return {
+                    product: fullProduct || item.product || null,
+                    product_unit: item.product_unit || null,
+                    quantity: item.quantity || 1,
+                    unit_price: item.unit_price || fullProduct?.cost_price || 0
+                };
+            });
+            
             setFormData({
                 supplier: purchaseOrder.supplier || null,
                 payment_method: purchaseOrder.payment_method || '',
@@ -125,23 +143,47 @@ export default function PurchaseFormModal({
                 taxes: purchaseOrder.taxes || 0,
                 discount: purchaseOrder.discount || 0,
                 shipping_cost: purchaseOrder.shipping_cost || 0,
-                items: (purchaseOrder.items || []).map(item => {
-                    // Buscar el producto completo del array de productos
-                    const productId = item.product?.id || item.product;
-                    const fullProduct = products.find(p => p.id === productId);
-                    
-                    return {
-                        product: fullProduct || item.product || null,
-                        product_unit: item.product_unit || null,
-                        quantity: item.quantity || 1,
-                        unit_price: item.unit_price || fullProduct?.cost_price || 0
-                    };
-                })
+                items: items
             });
+            
+            // Inicializar estados de búsqueda para items existentes
+            const newSearches = {};
+            items.forEach((item, index) => {
+                newSearches[index] = {
+                    search: item.product ? `${item.product.description} (SKU: ${item.product.sku})` : '',
+                    filtered: [],
+                    showDropdown: false
+                };
+            });
+            setProductSearches(newSearches);
         } else if (!purchaseOrder) {
             resetForm();
         }
-    }, [purchaseOrder, isOpen, loadingData, products]);
+    }, [purchaseOrder, isOpen, loadingData]);
+
+    // Cerrar dropdowns al hacer click fuera
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (!event.target.closest('.product-search-container')) {
+                setProductSearches(prev => {
+                    const updated = { ...prev };
+                    Object.keys(updated).forEach(key => {
+                        updated[key] = { ...updated[key], showDropdown: false };
+                    });
+                    return updated;
+                });
+            }
+        };
+
+        const hasOpenDropdown = Object.values(productSearches).some(ps => ps.showDropdown);
+        if (hasOpenDropdown) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [productSearches]);
 
     const resetForm = () => {
         setFormData({
@@ -163,6 +205,55 @@ export default function PurchaseFormModal({
         });
         setErrors({});
         setProductUnits({});
+        setProductSearches({});
+    };
+
+    // Manejar búsqueda de productos para un item específico
+    const handleProductSearch = (index, value) => {
+        setProductSearches(prev => ({
+            ...prev,
+            [index]: {
+                ...prev[index],
+                search: value,
+                filtered: value.length >= 2
+                    ? filteredProducts.filter(product => {
+                        const searchLower = value.toLowerCase();
+                        return product.description?.toLowerCase().includes(searchLower) ||
+                               product.sku?.toLowerCase().includes(searchLower);
+                    })
+                    : [],
+                showDropdown: value.length >= 2
+            }
+        }));
+    };
+
+    // Seleccionar producto de la búsqueda
+    const handleSelectProduct = async (index, product) => {
+        // Actualizar búsqueda
+        setProductSearches(prev => ({
+            ...prev,
+            [index]: {
+                search: `${product.description} (SKU: ${product.sku})`,
+                filtered: [],
+                showDropdown: false
+            }
+        }));
+
+        // Actualizar item
+        await updateItem(index, 'product', product);
+    };
+
+    // Limpiar búsqueda de producto
+    const handleClearProductSearch = (index) => {
+        setProductSearches(prev => ({
+            ...prev,
+            [index]: {
+                search: '',
+                filtered: [],
+                showDropdown: false
+            }
+        }));
+        updateItem(index, 'product', null);
     };
 
     const validateForm = () => {
@@ -239,6 +330,8 @@ export default function PurchaseFormModal({
 
     // Manejo de items
     const addItem = () => {
+        const newIndex = formData.items.length;
+        
         setFormData({
             ...formData,
             items: [
@@ -251,11 +344,28 @@ export default function PurchaseFormModal({
                 }
             ]
         });
+        
+        // Inicializar estado de búsqueda para el nuevo item
+        setProductSearches(prev => ({
+            ...prev,
+            [newIndex]: {
+                search: '',
+                filtered: [],
+                showDropdown: false
+            }
+        }));
     };
 
     const removeItem = (index) => {
         const newItems = formData.items.filter((_, i) => i !== index);
         setFormData({ ...formData, items: newItems });
+        
+        // Limpiar estado de búsqueda del item removido
+        setProductSearches(prev => {
+            const updated = { ...prev };
+            delete updated[index];
+            return updated;
+        });
     };
 
     const updateItem = async (index, field, value) => {
@@ -725,28 +835,60 @@ export default function PurchaseFormModal({
                                             <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                                                 <div className="md:col-span-4">
                                                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                                                        Producto
+                                                        Producto *
                                                     </label>
-                                                    <select
-                                                        value={item.product?.id || ''}
-                                                        onChange={(e) => {
-                                                            const product = products.find(p => p.id === parseInt(e.target.value));
-                                                            updateItem(index, 'product', product);
-                                                        }}
-                                                        disabled={loadingData || !formData.supplier}
-                                                        className={`w-full text-black px-2 py-1.5 text-sm border rounded focus:ring-2 focus:ring-[#18c29c] ${
-                                                            errors[`item_${index}_product`] ? 'border-red-500' : 'border-gray-300'
-                                                        }`}
-                                                    >
-                                                        <option value="">
-                                                            {!formData.supplier ? 'Primero seleccione un proveedor' : 'Seleccione...'}
-                                                        </option>
-                                                        {filteredProducts.map(product => (
-                                                            <option key={product.id} value={product.id}>
-                                                                {product.description} (SKU - {product.sku})
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                    <div className="relative product-search-container">
+                                                        <div className="flex items-center">
+                                                            <FaSearch className="text-[#18c29c] absolute left-2 z-10 text-xs" />
+                                                            <input
+                                                                type="text"
+                                                                value={productSearches[index]?.search || ''}
+                                                                onChange={(e) => handleProductSearch(index, e.target.value)}
+                                                                onFocus={() => {
+                                                                    if (productSearches[index]?.filtered && productSearches[index].filtered.length > 0) {
+                                                                        setProductSearches(prev => ({
+                                                                            ...prev,
+                                                                            [index]: { ...prev[index], showDropdown: true }
+                                                                        }));
+                                                                    }
+                                                                }}
+                                                                placeholder={!formData.supplier ? 'Primero seleccione un proveedor' : 'Buscar por nombre o SKU...'}
+                                                                disabled={loadingData || !formData.supplier}
+                                                                className={`w-full pl-7 pr-8 text-black px-2 py-1.5 text-sm border rounded focus:ring-2 focus:ring-[#18c29c] ${
+                                                                    errors[`item_${index}_product`] ? 'border-red-500' : 'border-gray-300'
+                                                                } disabled:bg-gray-100`}
+                                                            />
+                                                            {item.product && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleClearProductSearch(index)}
+                                                                    className="absolute right-2 text-gray-400 hover:text-gray-600 text-xs"
+                                                                >
+                                                                    <FaTimes />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        {/* Dropdown de resultados */}
+                                                        {productSearches[index]?.showDropdown && productSearches[index]?.filtered && productSearches[index].filtered.length > 0 && (
+                                                            <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                                {productSearches[index].filtered.map((product) => (
+                                                                    <div
+                                                                        key={product.id}
+                                                                        onClick={() => handleSelectProduct(index, product)}
+                                                                        className="px-3 py-2 hover:bg-[#18c29c]/10 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                                                    >
+                                                                        <div className="font-medium text-gray-900 text-sm">{product.description}</div>
+                                                                        <div className="text-xs text-gray-500">SKU: {product.sku} | Precio: ${product.cost_price || 0}</div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        {errors[`item_${index}_product`] && (
+                                                            <p className="text-red-500 text-xs mt-1">{errors[`item_${index}_product`]}</p>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 
                                                 {/* Product Unit Selector */}
@@ -761,11 +903,16 @@ export default function PurchaseFormModal({
                                                             className="w-full text-black px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-[#18c29c]"
                                                         >
                                                             <option value="">
-                                                                {selectedProduct.base_unit_name || 'unidad'} (Base)
+                                                                {
+                                                                    selectedProduct.base_unit_name === "unit" ? "Unidad" : 
+                                                                    selectedProduct.base_unit_name === "kg" ? "Kilogramo" :
+                                                                    selectedProduct.base_unit_name === "l" ? "Litro" : 
+                                                                    selectedProduct.base_unit_name === "ml" ? "Mililitro" : 
+                                                                    'unidad'}
                                                             </option>
                                                             {availableUnits.map(unit => (
                                                                 <option key={unit.id} value={unit.id}>
-                                                                    {unit.unit_name} ({unit.conversion_factor} {selectedProduct.base_unit_name || 'unidad'})
+                                                                    {unit.name} 
                                                                 </option>
                                                             ))}
                                                         </select>

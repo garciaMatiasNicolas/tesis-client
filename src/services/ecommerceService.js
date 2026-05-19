@@ -13,6 +13,7 @@ const useEcommerceService = () => {
                 // Agregar filtros como query parameters
                 if (filters.category) queryParams.append('category', filters.category);
                 if (filters.subcategory) queryParams.append('subcategory', filters.subcategory);
+                if (filters.supplier) queryParams.append('supplier', filters.supplier);
                 if (filters.search) queryParams.append('search', filters.search);
                 if (filters.min_price) queryParams.append('min_price', filters.min_price);
                 if (filters.max_price) queryParams.append('max_price', filters.max_price);
@@ -198,7 +199,6 @@ const useEcommerceService = () => {
                         product_id: item.id,
                         quantity: item.quantity
                     }, {}, true);
-                    console.log(`Item agregado: ${item.name} x${item.quantity}`);
                 }
                 
                 // 4. Hacer checkout del carrito (convertir a orden de venta)

@@ -113,6 +113,9 @@ export default function SalesFormModal({
     const [productUnits, setProductUnits] = useState({});
     const [alert, setAlert] = useState(null);
     const apiMethods = useApiMethods();
+    
+    // Estados para búsqueda de productos
+    const [productSearches, setProductSearches] = useState({}); // { itemIndex: { search: '', filtered: [], showDropdown: false } }
 
     // Inicializar servicios
     const productService = useProductService();
@@ -163,7 +166,7 @@ export default function SalesFormModal({
     // Manejar selección de origen y reintentar
     const handleOriginSelect = () => {
         if (!selectedOrigin.type || !selectedOrigin.id) {
-            alert('Por favor seleccione un origen');
+            setAlert({type: "warning", title: "Advertencia", message: 'Por favor seleccione un origen'});
             return;
         }
 
@@ -333,6 +336,7 @@ export default function SalesFormModal({
                             onClick={() => {
                                 setShowStockModal(false);
                                 setSelectedOrigin({ type: '', id: null });
+                                
                             }}
                             className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                         >
@@ -370,7 +374,7 @@ export default function SalesFormModal({
                 setCustomers(customersResponse.results || customersResponse || []);
                 
                 // Cargar productos usando el servicio
-                const productsResponse = await productService.getAllProducts();
+                const productsResponse = await productService.getAllProducts({all: true});
                 setProducts(productsResponse.results || productsResponse || []);
                 // Cargar provincias de Argentina
                 if (!salesOrder) {
@@ -445,6 +449,13 @@ export default function SalesFormModal({
 
                 loadUnitsForProducts();
                 
+                const salesItems = (salesOrder.sales_items || []).map(item => ({
+                    product_id: item.product || '',
+                    product_unit: item.product_unit || null,
+                    quantity: item.quantity || 1,
+                    unit_price: item.unit_price || 0
+                }));
+                
                 setFormData({
                     customer_id: salesOrder.customer?.id || '',
                     sales_channel: salesOrder.sales_channel || 'ecommerce',
@@ -466,13 +477,20 @@ export default function SalesFormModal({
                     patent: salesOrder.patent || '',
                     branch_origin_id: null,
                     warehouse_origin_id: null,
-                    sales_items: (salesOrder.sales_items || []).map(item => ({
-                        product_id: item.product || '',
-                        product_unit: item.product_unit || null,
-                        quantity: item.quantity || 1,
-                        unit_price: item.unit_price || 0
-                    }))
+                    sales_items: salesItems
                 });
+                
+                // Inicializar estados de búsqueda para items existentes
+                const newSearches = {};
+                salesItems.forEach((item, index) => {
+                    const product = products.find(p => p.id === parseInt(item.product_id));
+                    newSearches[index] = {
+                        search: product ? `${product.description} (SKU: ${product.sku})` : '',
+                        filtered: [],
+                        showDropdown: false
+                    };
+                });
+                setProductSearches(newSearches);
             } else {
                 // Create mode - reset to default values
                 const tomorrow = new Date();
@@ -518,16 +536,29 @@ export default function SalesFormModal({
             if (ciudadDropdown && !ciudadDropdown.contains(event.target)) {
                 setShowCiudadDropdown(false);
             }
+            
+            // Cerrar dropdowns de productos
+            if (!event.target.closest('.product-search-container')) {
+                setProductSearches(prev => {
+                    const updated = { ...prev };
+                    Object.keys(updated).forEach(key => {
+                        updated[key] = { ...updated[key], showDropdown: false };
+                    });
+                    return updated;
+                });
+            }
         };
 
-        if (showCustomerDropdown || showCiudadDropdown) {
+        const hasOpenDropdown = showCustomerDropdown || showCiudadDropdown || 
+                               Object.values(productSearches).some(ps => ps.showDropdown);
+        if (hasOpenDropdown) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showCustomerDropdown, showCiudadDropdown]);
+    }, [showCustomerDropdown, showCiudadDropdown, productSearches]);
 
     // Calculate total price automatically
     useEffect(() => {
@@ -669,9 +700,14 @@ export default function SalesFormModal({
     };
 
     // Manejar búsqueda de clientes
-    const handleCustomerSearch = (value) => {
+    const handleCustomerSearch = async (value, typeofsearch = 'input') => {
         setCustomerSearch(value);
-        
+       
+        if (typeofsearch !== 'input') {
+            const customersResponse = await crmService.getCustomers();
+            setCustomers(customersResponse.results || customersResponse || []);
+        };
+
         if (value.length >= 2) {
             const filtered = customers.filter(customer => {
                 const displayName = customer.display_name || customer.full_name || 
@@ -711,10 +747,76 @@ export default function SalesFormModal({
         }
     };
 
+    // Manejar búsqueda de productos para un item específico
+    const handleProductSearch = (index, value) => {
+        setProductSearches(prev => ({
+            ...prev,
+            [index]: {
+                ...prev[index],
+                search: value,
+                filtered: value.length >= 2
+                    ? products.filter(product => {
+                        const searchLower = value.toLowerCase();
+                        return product.description?.toLowerCase().includes(searchLower) ||
+                               product.sku?.toLowerCase().includes(searchLower);
+                    })
+                    : [],
+                showDropdown: value.length >= 2
+            }
+        }));
+    };
+
+    // Seleccionar producto de la búsqueda
+    const handleSelectProduct = async (index, product) => {
+        // Actualizar búsqueda
+        setProductSearches(prev => ({
+            ...prev,
+            [index]: {
+                search: `${product.description} (SKU: ${product.sku})`,
+                filtered: [],
+                showDropdown: false
+            }
+        }));
+
+        // Actualizar item - usar handleItemChange para mantener la lógica existente
+        await handleItemChange(index, 'product_id', product.id.toString());
+    };
+
+    // Limpiar búsqueda de producto
+    const handleClearProductSearch = (index) => {
+        setProductSearches(prev => ({
+            ...prev,
+            [index]: {
+                search: '',
+                filtered: [],
+                showDropdown: false
+            }
+        }));
+        
+        setFormData(prev => ({
+            ...prev,
+            sales_items: prev.sales_items.map((item, i) => 
+                i === index ? { ...item, product_id: '', product_unit: null, unit_price: 0 } : item
+            )
+        }));
+    };
+
     const handleAddItem = () => {
+        const newIndex = formData.sales_items.length;
+        
         setFormData(prev => ({
             ...prev,
             sales_items: [...prev.sales_items, { product_id: '', product_unit: null, quantity: '1', unit_price: 0 }]
+        }));
+        
+        // Inicializar estado de búsqueda para el nuevo item
+        setProductSearches(prev => ({
+            ...prev,
+            [newIndex]: {
+                search: '',
+                filtered: [],
+                showDropdown: false
+            }
         }));
     };
 
@@ -723,6 +825,13 @@ export default function SalesFormModal({
             ...prev,
             sales_items: prev.sales_items.filter((_, i) => i !== index)
         }));
+        
+        // Limpiar estado de búsqueda del item removido
+        setProductSearches(prev => {
+            const updated = { ...prev };
+            delete updated[index];
+            return updated;
+        });
     };
 
     const handleItemChange = async (index, field, value) => {
@@ -866,7 +975,7 @@ export default function SalesFormModal({
                     ...newCustomerData
                 });
                 customerId = newCustomer.id;
-            }
+            };
             
             // Convert string numbers to proper types
             const submitData = {
@@ -890,6 +999,16 @@ export default function SalesFormModal({
         } catch (error) {
             // Verificar si es un error de stock
             if (error.response?.data?.sales_items) {
+                if (customerType === 'new') {
+                    setCustomerType('registered');
+                    crmService.initialize(apiMethods);
+                    // Cargar clientes
+                    const customersResponse = await crmService.getCustomers();
+                    setCustomers(customersResponse.results || customersResponse || []); 
+                    let customer = customersResponse.results.find((c => c.email == newCustomerData.email));
+                    handleSelectCustomer(customer);
+                };
+
                 const stockErrors = error.response.data.sales_items;
                 
                 // Si es un array de errores, tomar el primero
@@ -922,6 +1041,15 @@ export default function SalesFormModal({
                     });
                     return;
                 }
+            }
+
+            if (error.response?.data?.email) {
+                setAlert({
+                    type: 'danger',
+                    title: 'Error al crear cliente',
+                    message: `El email ${newCustomerData.email} ya está registrado. Por favor utiliza otro email o selecciona el cliente existente.`
+                });
+                return;
             }
             
             // Parsear todos los errores de validación
@@ -1553,22 +1681,58 @@ export default function SalesFormModal({
                                     return (
                                         <div key={index} className="flex gap-2 mb-2 items-start">
                                             <div className="flex-1">
-                                                <select
-                                                    value={item.product_id}
-                                                    onChange={(e) => handleItemChange(index, 'product_id', e.target.value)}
-                                                    className="w-full text-black px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent"
-                                                    disabled={loadingData}
-                                                >
-                                                    <option value="">{loadingData ? 'Cargando productos...' : 'Seleccionar producto'}</option>
-                                                    {products.map(product => (
-                                                        <option key={product.id} value={product.id}>
-                                                            {product.description} - SKU {product.sku} - ${product.price || 0}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                {errors[`item_${index}_product`] && (
-                                                    <p className="text-red-500 text-xs mt-1">{errors[`item_${index}_product`]}</p>
-                                                )}
+                                                <div className="relative product-search-container">
+                                                    <div className="flex items-center">
+                                                        <FaSearch className="text-[#18c29c] absolute left-3 z-10 text-sm" />
+                                                        <input
+                                                            type="text"
+                                                            value={productSearches[index]?.search || ''}
+                                                            onChange={(e) => handleProductSearch(index, e.target.value)}
+                                                            onFocus={() => {
+                                                                if (productSearches[index]?.filtered && productSearches[index].filtered.length > 0) {
+                                                                    setProductSearches(prev => ({
+                                                                        ...prev,
+                                                                        [index]: { ...prev[index], showDropdown: true }
+                                                                    }));
+                                                                }
+                                                            }}
+                                                            placeholder={loadingData ? 'Cargando productos...' : 'Buscar por nombre o SKU...'}
+                                                            disabled={loadingData}
+                                                            className={`w-full pl-10 pr-10 text-black px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#18c29c] focus:border-transparent ${
+                                                                errors[`item_${index}_product`] ? 'border-red-500' : 'border-gray-300'
+                                                            } disabled:bg-gray-100`}
+                                                        />
+                                                        {item.product_id && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleClearProductSearch(index)}
+                                                                className="absolute right-3 text-gray-400 hover:text-gray-600"
+                                                            >
+                                                                <FaTimes />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {/* Dropdown de resultados */}
+                                                    {productSearches[index]?.showDropdown && productSearches[index]?.filtered && productSearches[index].filtered.length > 0 && (
+                                                        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                                            {productSearches[index].filtered.map((product) => (
+                                                                <div
+                                                                    key={product.id}
+                                                                    onClick={() => handleSelectProduct(index, product)}
+                                                                    className="px-3 py-2 hover:bg-[#18c29c]/10 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                                                >
+                                                                    <div className="font-medium text-gray-900">{product.description}</div>
+                                                                    <div className="text-xs text-gray-500">SKU: {product.sku} | Precio: ${product.price || 0}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {errors[`item_${index}_product`] && (
+                                                        <p className="text-red-500 text-xs mt-1">{errors[`item_${index}_product`]}</p>
+                                                    )}
+                                                </div>
                                             </div>
                                             
                                             {/* Product Unit Selector */}
@@ -1746,7 +1910,7 @@ export default function SalesFormModal({
                                         type="text"
                                         value={`${formatPrice(formData.total_price)}`}
                                         readOnly
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-600 text-right"
                                     />
                                 </div>
                             </div>
@@ -1769,6 +1933,7 @@ export default function SalesFormModal({
 
                         {/* Footer */}
                         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                            <span style={{color: "red"}}>{Object.keys(errors).length !== 0 && "Hay errores especificados en el formulario. Corrijalos y continue con la creación"}</span>
                             <button
                                 type="button"
                                 onClick={onClose}

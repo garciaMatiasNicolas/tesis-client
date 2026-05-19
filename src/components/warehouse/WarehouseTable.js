@@ -1,8 +1,9 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { FaSearch, FaFilter, FaPlus, FaEdit, FaTrash, FaMapMarkerAlt, FaStore, FaCalendar, FaWarehouse } from 'react-icons/fa';
+import React, { useState, useEffect, useRef } from 'react';
+import { FaSearch, FaFilter, FaPlus, FaEdit, FaTrash, FaMapMarkerAlt, FaStore, FaCalendar, FaWarehouse, FaDownload, FaUpload, FaFileExcel, FaSpinner } from 'react-icons/fa';
 import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
 import WarehouseModal from './WarehouseModal';
+import useWarehouseService from '@/services/warehouseService';
 
 export default function WarehouseTable({ 
     warehouses = [], 
@@ -13,8 +14,12 @@ export default function WarehouseTable({
     onUpdateWarehouse,
     searchTerm = "",
     onSearchChange,
-    showActions = true 
+    showActions = true,
+    onReload,
+    onShowAlert
 }) {
+    const warehouseService = useWarehouseService();
+    const fileInputRef = useRef(null);
     const [filteredWarehouses, setFilteredWarehouses] = useState([]);
     const [stores, setStores] = useState(["Todas"]);
     const [selectedStore, setSelectedStore] = useState("Todas");
@@ -22,6 +27,9 @@ export default function WarehouseTable({
     const [isDeleting, setIsDeleting] = useState(false);
     const [warehouseModal, setWarehouseModal] = useState(false);
     const [editingWarehouse, setEditingWarehouse] = useState(null);
+    const [importing, setImporting] = useState(false);
+    const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+    const [exporting, setExporting] = useState(false);
 
     // Efecto para filtrar depósitos
     useEffect(() => {
@@ -126,6 +134,109 @@ export default function WarehouseTable({
         setWarehouseModal(false);
         setEditingWarehouse(null);
     };
+    
+    // Descargar plantilla Excel
+    const handleDownloadTemplate = async () => {
+        try {
+            setDownloadingTemplate(true);
+            const blob = await warehouseService.exportTemplate();
+            
+            // Validar que sea un Blob
+            if (!blob || !(blob instanceof Blob)) {
+                console.error('Respuesta no es un Blob:', blob);
+                throw new Error('La respuesta del servidor no es válida');
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'plantilla_depositos.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Error descargando plantilla:', error);
+            if (onShowAlert) {
+                onShowAlert('danger', 'Error al descargar plantilla', 'No se pudo descargar la plantilla Excel. Intenta nuevamente.');
+            }
+        } finally {
+            setDownloadingTemplate(false);
+        }
+    };
+    
+    // Exportar depósitos actuales
+    const handleExport = async () => {
+        try {
+            setExporting(true);
+            const blob = await warehouseService.exportData();
+            
+            // Validar que sea un Blob
+            if (!blob || !(blob instanceof Blob)) {
+                console.error('Respuesta no es un Blob:', blob);
+                throw new Error('La respuesta del servidor no es válida');
+            }
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'depositos_export.csv';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (error) {
+            console.error('Error exportando depósitos:', error);
+            if (onShowAlert) {
+                onShowAlert('danger', 'Error al exportar', 'No se pudieron exportar los depósitos. Intenta nuevamente.');
+            }
+        } finally {
+            setExporting(false);
+        }
+    };
+    
+    // Importar depósitos desde Excel
+    const handleImport = async (event) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        
+        try {
+            setImporting(true);
+            const response = await warehouseService.importData(file);
+            
+            if (onShowAlert) {
+                const hasErrors = response.errors && response.errors.length > 0;
+                const errorDetails = hasErrors ? `\n\nErrores encontrados:\n${response.errors.join('\n')}` : '';
+                const alertType = hasErrors ? 'warning' : 'success';
+                const alertTitle = hasErrors ? 'Importación con errores' : 'Importación completada';
+                
+                onShowAlert(
+                    alertType, 
+                    alertTitle, 
+                    `Creados: ${response.created}, Actualizados: ${response.updated}${errorDetails}`
+                );
+            }
+            
+            // Recargar lista de depósitos
+            if (onReload) {
+                await onReload();
+            }
+            
+            // Limpiar input
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        } catch (error) {
+            console.error('Error importando depósitos:', error);
+            const errorMsg = error.response?.data?.error || 'Error al importar depósitos';
+            
+            if (onShowAlert) {
+                onShowAlert('danger', 'Error al importar', errorMsg);
+            }
+        } finally {
+            setImporting(false);
+        }
+    };
 
     // Loading state
     if (loading) {
@@ -160,15 +271,64 @@ export default function WarehouseTable({
                         Administra los depósitos de tu negocio
                     </p>
                 </div>
-                {showActions && (
+                <div className="flex items-center gap-2 flex-wrap">
+                    {/* Botones de importación/exportación */}
                     <button
-                        onClick={() => setWarehouseModal(true)}
-                        className="inline-flex items-center px-4 py-2 bg-[#18c29c] hover:bg-[#15a884] text-white rounded-lg transition-colors duration-200 shadow-sm"
+                        onClick={handleDownloadTemplate}
+                        disabled={downloadingTemplate}
+                        className="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm disabled:opacity-50"
+                        title="Descargar plantilla Excel con catálogos de referencia"
                     >
-                        <FaPlus className="mr-2" />
-                        Nuevo Depósito
+                        {downloadingTemplate ? (
+                            <><FaSpinner className="mr-2 animate-spin" /> Descargando...</>
+                        ) : (
+                            <><FaFileExcel className="mr-2" /> Plantilla</>
+                        )}
                     </button>
-                )}
+                    
+                    <button
+                        onClick={handleExport}
+                        disabled={exporting || warehouses.length === 0}
+                        className="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors duration-200 text-sm disabled:opacity-50"
+                        title="Exportar datos actuales a CSV"
+                    >
+                        {exporting ? (
+                            <><FaSpinner className="mr-2 animate-spin" /> Exportando...</>
+                        ) : (
+                            <><FaDownload className="mr-2" /> Exportar</>
+                        )}
+                    </button>
+                    
+                    <div className="relative">
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".xlsx,.xls"
+                            onChange={handleImport}
+                            className="hidden"
+                            id="warehouse-file-input"
+                        />
+                        <label
+                            htmlFor="warehouse-file-input"
+                            className={`inline-flex items-center px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200 cursor-pointer text-sm ${
+                                importing ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
+                        >
+                            <FaUpload className="mr-2" />
+                            {importing ? 'Importando...' : 'Importar'}
+                        </label>
+                    </div>
+                    
+                    {showActions && (
+                        <button
+                            onClick={() => setWarehouseModal(true)}
+                            className="inline-flex items-center px-4 py-2 bg-[#18c29c] hover:bg-[#15a884] text-white rounded-lg transition-colors duration-200 shadow-sm"
+                        >
+                            <FaPlus className="mr-2" />
+                            Nuevo Depósito
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Filtros y búsqueda */}

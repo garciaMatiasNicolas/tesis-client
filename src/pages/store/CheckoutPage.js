@@ -9,8 +9,10 @@ import ShoppingCart from '@/components/store/ShoppingCart';
 import UserCreateModal from '@/components/store/UserCreateModal';
 import UserLoginModal from '@/components/store/UserLoginModal';
 import useEcommerceService from '@/services/ecommerceService';
-import useApiMethods from '@/hooks/useApiMethods';
 import { isAuthenticated, removeAuthToken } from '@/services/auth';
+import { FaWhatsapp } from 'react-icons/fa';
+import { formatPrice } from '@/utils/formatData';
+
 
 const CheckoutPage = () => {
     const router = useRouter();
@@ -304,13 +306,7 @@ const CheckoutPage = () => {
                 
                 const userResult = await createUserForCustomerAndLogIn(userData, customerDataForRegistration);
                 setUser(userResult);
-                
-                // Si se vinculó con un cliente existente, mostrar mensaje informativo
-                if (userResult.linked_to_existing) {
-                    console.log('✅ Cuenta vinculada con historial previo:', userResult.message);
-                    // Podrías mostrar una notificación aquí si lo deseas
-                }
-            }
+            };
 
             setShowUserCreateModal(false);
             
@@ -353,42 +349,25 @@ const CheckoutPage = () => {
 
     const processCompleteCheckout = async () => {
         try {
+            // Para tiendas con checkout completo, usar el backend
+            await completeCheckout(formData, cart);
             
-            if (storeConfig?.view_only) {
-                // Para tiendas view_only, generar mensaje de WhatsApp
-                const whatsappNumber = storeConfig.contact_phone || '';
+            // Enviar mensaje de WhatsApp con los detalles del pedido
+
+            if (storeConfig?.phone) {
+                const whatsappNumber = storeConfig.phone.replace(/[^0-9]/g, '');
                 const message = generateWhatsAppMessage();
                 
-                setOrderPlaced(true);
-                clearCart();
-                
-                // Redirigir a WhatsApp
+                // Abrir WhatsApp en una nueva pestaña
                 window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
-                
-                setTimeout(() => {
-                    router.push('/store');
-                }, 1500);
-                
-            } else {
-                // Para tiendas con checkout completo, usar el backend
-                const result = await completeCheckout(formData, cart);
-                
-                // Enviar mensaje de WhatsApp con los detalles del pedido
-                if (storeConfig?.phone) {
-                    const whatsappNumber = storeConfig.phone.replace(/[^0-9]/g, '');
-                    const message = generateWhatsAppMessage();
-                    
-                    // Abrir WhatsApp en una nueva pestaña
-                    window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
-                }
-                
-                setOrderPlaced(true);
-                clearCart();
-                
-                setTimeout(() => {
-                    router.push('/store');
-                }, 3000);
             }
+            
+            setOrderPlaced(true);
+            clearCart();
+            
+            setTimeout(() => {
+                router.push('/store');
+            }, 5000);
             
         } catch (error) {
             console.error('Error al procesar checkout:', error);
@@ -481,9 +460,7 @@ const CheckoutPage = () => {
                                     ? theme.text?.dark?.secondary || '#e0e0e0' 
                                     : theme.text?.light?.secondary || '#3e3e3e'
                             }}>
-                            {storeConfig?.view_only 
-                                ? 'Tu pedido ha sido enviado a WhatsApp. Te contactaremos pronto.' 
-                                : 'Hemos recibido tu pedido. Te contactaremos para confirmar los detalles.'}
+                            Tu pedido ha sido enviado a WhatsApp. Te contactaremos pronto.
                         </p>
                         <button 
                             onClick={() => router.push('/store')}
@@ -593,6 +570,7 @@ const CheckoutPage = () => {
                                             name="firstName"
                                             value={formData.firstName}
                                             onChange={handleInputChange}
+                                            autoComplete='off'
                                             disabled={isUserAuthenticated}
                                             className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
                                             style={{ 
@@ -631,6 +609,7 @@ const CheckoutPage = () => {
                                             name="lastName"
                                             value={formData.lastName}
                                             onChange={handleInputChange}
+                                            autoComplete='off'
                                             disabled={isUserAuthenticated}
                                             className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
                                             style={{ 
@@ -669,6 +648,7 @@ const CheckoutPage = () => {
                                             name="email"
                                             value={formData.email}
                                             onChange={handleInputChange}
+                                            autoComplete='off'
                                             disabled={isUserAuthenticated}
                                             className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
                                             style={{ 
@@ -709,6 +689,7 @@ const CheckoutPage = () => {
                                             onChange={handleInputChange}
                                             disabled={isUserAuthenticated}
                                             placeholder="Ej. 3456789012"
+                                            autoComplete="off"
                                             className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
                                             style={{ 
                                                 backgroundColor: isDarkMode 
@@ -731,162 +712,162 @@ const CheckoutPage = () => {
                                         )}
                                     </div>
                                     
-                                    {/* Campos de dirección solo si no es view_only */}
-                                    {!storeConfig?.view_only && (
-                                        <>
-                                            {/* Dirección */}
-                                            <div className="sm:col-span-2">
-                                                <label className="block mb-2 text-sm font-medium"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                                            : theme.text?.light?.secondary || '#3e3e3e'
-                                                    }}>
-                                                    Dirección *
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    name="address"
-                                                    value={formData.address}
-                                                    onChange={handleInputChange}
-                                                    disabled={isUserAuthenticated}
-                                                    className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
-                                                    style={{ 
-                                                        backgroundColor: isDarkMode 
-                                                            ? theme.background?.dark?.input || '#2a2a2a' 
-                                                            : theme.background?.light?.input || '#f9f9f9',
-                                                        borderColor: formErrors.address 
-                                                            ? '#e53e3e' 
-                                                            : isDarkMode 
-                                                                ? theme.border?.dark?.main || '#3a3a3a' 
-                                                                : theme.border?.light?.main || '#e0e0e0',
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.primary || '#ffffff' 
-                                                            : theme.text?.light?.primary || '#252525',
-                                                        outline: 'none',
-                                                        opacity: isUserAuthenticated ? 0.6 : 1,
-                                                    }}
-                                                />
-                                                {formErrors.address && (
-                                                    <p className="mt-1 text-sm text-red-500">{formErrors.address}</p>
-                                                )}
-                                            </div>
+                                    {/* Dirección */}
+                                    <div className="sm:col-span-2">
+                                        <label className="block mb-2 text-sm font-medium"
+                                            style={{ 
+                                                color: isDarkMode 
+                                                    ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                    : theme.text?.light?.secondary || '#3e3e3e'
+                                            }}>
+                                            Dirección *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="address"
+                                            value={formData.address}
+                                            onChange={handleInputChange}
+                                            autoComplete="off"
+                                            disabled={isUserAuthenticated}
+                                            className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
+                                            style={{ 
+                                                backgroundColor: isDarkMode 
+                                                    ? theme.background?.dark?.input || '#2a2a2a' 
+                                                    : theme.background?.light?.input || '#f9f9f9',
+                                                borderColor: formErrors.address 
+                                                    ? '#e53e3e' 
+                                                    : isDarkMode 
+                                                        ? theme.border?.dark?.main || '#3a3a3a' 
+                                                        : theme.border?.light?.main || '#e0e0e0',
+                                                color: isDarkMode 
+                                                    ? theme.text?.dark?.primary || '#ffffff' 
+                                                    : theme.text?.light?.primary || '#252525',
+                                                outline: 'none',
+                                                opacity: isUserAuthenticated ? 0.6 : 1,
+                                            }}
+                                        />
+                                        {formErrors.address && (
+                                            <p className="mt-1 text-sm text-red-500">{formErrors.address}</p>
+                                        )}
+                                    </div>
 
-                                            {/* Provincia */}
-                                            <div>
-                                                <label className="block mb-2 text-sm font-medium"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                                            : theme.text?.light?.secondary || '#3e3e3e'
-                                                    }}>
-                                                    Provincia *
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    name="state"
-                                                    value={formData.state}
-                                                    onChange={handleInputChange}
-                                                    disabled={isUserAuthenticated}
-                                                    className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
-                                                    style={{ 
-                                                        backgroundColor: isDarkMode 
-                                                            ? theme.background?.dark?.input || '#2a2a2a' 
-                                                            : theme.background?.light?.input || '#f9f9f9',
-                                                        borderColor: formErrors.state 
-                                                            ? '#e53e3e' 
-                                                            : isDarkMode 
-                                                                ? theme.border?.dark?.main || '#3a3a3a' 
-                                                                : theme.border?.light?.main || '#e0e0e0',
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.primary || '#ffffff' 
-                                                            : theme.text?.light?.primary || '#252525',
-                                                        outline: 'none',
-                                                        opacity: isUserAuthenticated ? 0.6 : 1,
-                                                    }}
-                                                />
-                                                {formErrors.state && (
-                                                    <p className="mt-1 text-sm text-red-500">{formErrors.state}</p>
-                                                )}
-                                            </div>
-                                            
-                                            {/* Ciudad */}
-                                            <div>
-                                                <label className="block mb-2 text-sm font-medium"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                                            : theme.text?.light?.secondary || '#3e3e3e'
-                                                    }}>
-                                                    Ciudad *
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    name="city"
-                                                    value={formData.city}
-                                                    onChange={handleInputChange}
-                                                    disabled={isUserAuthenticated}
-                                                    className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
-                                                    style={{ 
-                                                        backgroundColor: isDarkMode 
-                                                            ? theme.background?.dark?.input || '#2a2a2a' 
-                                                            : theme.background?.light?.input || '#f9f9f9',
-                                                        borderColor: formErrors.city 
-                                                            ? '#e53e3e' 
-                                                            : isDarkMode 
-                                                                ? theme.border?.dark?.main || '#3a3a3a' 
-                                                                : theme.border?.light?.main || '#e0e0e0',
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.primary || '#ffffff' 
-                                                            : theme.text?.light?.primary || '#252525',
-                                                        outline: 'none',
-                                                        opacity: isUserAuthenticated ? 0.6 : 1,
-                                                    }}
-                                                />
-                                                {formErrors.city && (
-                                                    <p className="mt-1 text-sm text-red-500">{formErrors.city}</p>
-                                                )}
-                                            </div>
-                                            
-                                            {/* Código postal */}
-                                            <div>
-                                                <label className="block mb-2 text-sm font-medium"
-                                                    style={{ 
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                                            : theme.text?.light?.secondary || '#3e3e3e'
-                                                    }}>
-                                                    Código Postal *
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    name="postalCode"
-                                                    value={formData.postalCode}
-                                                    onChange={handleInputChange}
-                                                    disabled={isUserAuthenticated}
-                                                    className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
-                                                    style={{ 
-                                                        backgroundColor: isDarkMode 
-                                                            ? theme.background?.dark?.input || '#2a2a2a' 
-                                                            : theme.background?.light?.input || '#f9f9f9',
-                                                        borderColor: formErrors.postalCode 
-                                                            ? '#e53e3e' 
-                                                            : isDarkMode 
-                                                                ? theme.border?.dark?.main || '#3a3a3a' 
-                                                                : theme.border?.light?.main || '#e0e0e0',
-                                                        color: isDarkMode 
-                                                            ? theme.text?.dark?.primary || '#ffffff' 
-                                                            : theme.text?.light?.primary || '#252525',
-                                                        outline: 'none',
-                                                        opacity: isUserAuthenticated ? 0.6 : 1,
-                                                    }}
-                                                />
-                                                {formErrors.postalCode && (
-                                                    <p className="mt-1 text-sm text-red-500">{formErrors.postalCode}</p>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
+                                    {/* Provincia */}
+                                    <div>
+                                        <label className="block mb-2 text-sm font-medium"
+                                            style={{ 
+                                                color: isDarkMode 
+                                                    ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                    : theme.text?.light?.secondary || '#3e3e3e'
+                                            }}>
+                                            Provincia *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="state"
+                                            value={formData.state}
+                                            onChange={handleInputChange}
+                                            autoComplete="off"
+                                            disabled={isUserAuthenticated}
+                                            className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
+                                            style={{ 
+                                                backgroundColor: isDarkMode 
+                                                    ? theme.background?.dark?.input || '#2a2a2a' 
+                                                    : theme.background?.light?.input || '#f9f9f9',
+                                                borderColor: formErrors.state 
+                                                    ? '#e53e3e' 
+                                                    : isDarkMode 
+                                                        ? theme.border?.dark?.main || '#3a3a3a' 
+                                                        : theme.border?.light?.main || '#e0e0e0',
+                                                color: isDarkMode 
+                                                    ? theme.text?.dark?.primary || '#ffffff' 
+                                                    : theme.text?.light?.primary || '#252525',
+                                                outline: 'none',
+                                                opacity: isUserAuthenticated ? 0.6 : 1,
+                                            }}
+                                        />
+                                        {formErrors.state && (
+                                            <p className="mt-1 text-sm text-red-500">{formErrors.state}</p>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Ciudad */}
+                                    <div>
+                                        <label className="block mb-2 text-sm font-medium"
+                                            style={{ 
+                                                color: isDarkMode 
+                                                    ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                    : theme.text?.light?.secondary || '#3e3e3e'
+                                            }}>
+                                            Ciudad *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="city"
+                                            value={formData.city}
+                                            onChange={handleInputChange}
+                                            autoComplete="off"
+                                            disabled={isUserAuthenticated}
+                                            className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
+                                            style={{ 
+                                                backgroundColor: isDarkMode 
+                                                    ? theme.background?.dark?.input || '#2a2a2a' 
+                                                    : theme.background?.light?.input || '#f9f9f9',
+                                                borderColor: formErrors.city 
+                                                    ? '#e53e3e' 
+                                                    : isDarkMode 
+                                                        ? theme.border?.dark?.main || '#3a3a3a' 
+                                                        : theme.border?.light?.main || '#e0e0e0',
+                                                color: isDarkMode 
+                                                    ? theme.text?.dark?.primary || '#ffffff' 
+                                                    : theme.text?.light?.primary || '#252525',
+                                                outline: 'none',
+                                                opacity: isUserAuthenticated ? 0.6 : 1,
+                                            }}
+                                        />
+                                        {formErrors.city && (
+                                            <p className="mt-1 text-sm text-red-500">{formErrors.city}</p>
+                                        )}
+                                    </div>
+                                    
+                                    {/* Código postal */}
+                                    <div>
+                                        <label className="block mb-2 text-sm font-medium"
+                                            style={{ 
+                                                color: isDarkMode 
+                                                    ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                    : theme.text?.light?.secondary || '#3e3e3e'
+                                            }}>
+                                            Código Postal *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="postalCode"
+                                            value={formData.postalCode}
+                                            onChange={handleInputChange}
+                                            autoComplete="off"
+                                            disabled={isUserAuthenticated}
+                                            className="w-full px-4 py-2 rounded-md border focus:outline-none focus:ring-2 transition-all"
+                                            style={{ 
+                                                backgroundColor: isDarkMode 
+                                                    ? theme.background?.dark?.input || '#2a2a2a' 
+                                                    : theme.background?.light?.input || '#f9f9f9',
+                                                borderColor: formErrors.postalCode 
+                                                    ? '#e53e3e' 
+                                                    : isDarkMode 
+                                                        ? theme.border?.dark?.main || '#3a3a3a' 
+                                                        : theme.border?.light?.main || '#e0e0e0',
+                                                color: isDarkMode 
+                                                    ? theme.text?.dark?.primary || '#ffffff' 
+                                                    : theme.text?.light?.primary || '#252525',
+                                                outline: 'none',
+                                                opacity: isUserAuthenticated ? 0.6 : 1,
+                                            }}
+                                        />
+                                        {formErrors.postalCode && (
+                                            <p className="mt-1 text-sm text-red-500">{formErrors.postalCode}</p>
+                                        )}
+                                    </div>
+
                                     
                                     {/* Notas adicionales - span completo */}
                                     <div className="sm:col-span-2">
@@ -916,49 +897,47 @@ const CheckoutPage = () => {
                                                     : theme.text?.light?.primary || '#252525',
                                                 outline: 'none',
                                             }}
+                                            autoComplete="off"
                                             placeholder="Instrucciones especiales para tu pedido..."
                                         />
                                     </div>
                                 </div>
                                 
-                                {/* Solo para view_only: Nota WhatsApp */}
-                                {storeConfig?.view_only && (
-                                    <div className="mt-6 p-4 rounded-md"
-                                        style={{ 
-                                            backgroundColor: isDarkMode 
-                                                ? `${theme.background?.dark?.elevated || '#252525'}40` 
-                                                : `${theme.background?.light?.elevated || '#f5f0e8'}80`,
-                                            borderLeft: `4px solid ${isDarkMode 
+                                <div className="mt-6 p-4 rounded-md"
+                                    style={{ 
+                                        backgroundColor: isDarkMode 
+                                            ? `${theme.background?.dark?.elevated || '#252525'}40` 
+                                            : `${theme.background?.light?.elevated || '#f5f0e8'}80`,
+                                        borderLeft: `4px solid ${isDarkMode 
+                                            ? theme.accent?.dark?.main || '#7a2639' 
+                                            : theme.accent?.light?.main || '#9a334d'}`,
+                                    }}>
+                                    <div className="flex items-center gap-2">
+                                        <svg className="w-5 h-5" fill="currentColor" style={{
+                                            color: isDarkMode 
                                                 ? theme.accent?.dark?.main || '#7a2639' 
-                                                : theme.accent?.light?.main || '#9a334d'}`,
-                                        }}>
-                                        <div className="flex items-center gap-2">
-                                            <svg className="w-5 h-5" fill="currentColor" style={{
+                                                : theme.accent?.light?.main || '#9a334d'
+                                        }} viewBox="0 0 24 24">
+                                            <path d="M17.498 14.382c-.301-.15-1.767-.867-2.04-.966-.273-.101-.473-.15-.673.15-.197.295-.771.964-.944 1.162-.175.195-.349.21-.646.075-.3-.15-1.263-.465-2.403-1.485-.888-.795-1.484-1.77-1.66-2.07-.174-.3-.019-.465.13-.615.136-.135.301-.345.451-.523.146-.181.194-.301.297-.496.1-.21.049-.375-.025-.524-.075-.15-.672-1.62-.922-2.206-.24-.584-.487-.51-.672-.51-.172-.015-.371-.015-.571-.015-.2 0-.523.074-.798.359-.273.3-1.045 1.02-1.045 2.475s1.07 2.865 1.219 3.075c.149.195 2.105 3.195 5.1 4.485.714.3 1.27.48 1.704.629.714.227 1.365.195 1.88.121.574-.091 1.767-.721 2.016-1.426.255-.705.255-1.29.18-1.425-.074-.135-.27-.21-.57-.345m-5.446 7.443h-.016c-1.77 0-3.524-.48-5.055-1.38l-.36-.214-3.75.975 1.005-3.645-.239-.375c-.99-1.576-1.516-3.391-1.516-5.26 0-5.445 4.455-9.885 9.942-9.885 2.654 0 5.145 1.035 7.021 2.91 1.875 1.859 2.909 4.35 2.909 6.99-.004 5.444-4.46 9.885-9.935 9.885M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.893c0 2.096.549 4.14 1.595 5.945L0 24l6.335-1.652c1.746.943 3.71 1.444 5.71 1.447h.006c6.585 0 11.946-5.336 11.949-11.896 0-3.176-1.24-6.165-3.495-8.411"/>
+                                        </svg>
+                                        <span className="font-medium"
+                                            style={{ 
                                                 color: isDarkMode 
                                                     ? theme.accent?.dark?.main || '#7a2639' 
                                                     : theme.accent?.light?.main || '#9a334d'
-                                            }} viewBox="0 0 24 24">
-                                                <path d="M17.498 14.382c-.301-.15-1.767-.867-2.04-.966-.273-.101-.473-.15-.673.15-.197.295-.771.964-.944 1.162-.175.195-.349.21-.646.075-.3-.15-1.263-.465-2.403-1.485-.888-.795-1.484-1.77-1.66-2.07-.174-.3-.019-.465.13-.615.136-.135.301-.345.451-.523.146-.181.194-.301.297-.496.1-.21.049-.375-.025-.524-.075-.15-.672-1.62-.922-2.206-.24-.584-.487-.51-.672-.51-.172-.015-.371-.015-.571-.015-.2 0-.523.074-.798.359-.273.3-1.045 1.02-1.045 2.475s1.07 2.865 1.219 3.075c.149.195 2.105 3.195 5.1 4.485.714.3 1.27.48 1.704.629.714.227 1.365.195 1.88.121.574-.091 1.767-.721 2.016-1.426.255-.705.255-1.29.18-1.425-.074-.135-.27-.21-.57-.345m-5.446 7.443h-.016c-1.77 0-3.524-.48-5.055-1.38l-.36-.214-3.75.975 1.005-3.645-.239-.375c-.99-1.576-1.516-3.391-1.516-5.26 0-5.445 4.455-9.885 9.942-9.885 2.654 0 5.145 1.035 7.021 2.91 1.875 1.859 2.909 4.35 2.909 6.99-.004 5.444-4.46 9.885-9.935 9.885M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.893c0 2.096.549 4.14 1.595 5.945L0 24l6.335-1.652c1.746.943 3.71 1.444 5.71 1.447h.006c6.585 0 11.946-5.336 11.949-11.896 0-3.176-1.24-6.165-3.495-8.411"/>
-                                            </svg>
-                                            <span className="font-medium"
-                                                style={{ 
-                                                    color: isDarkMode 
-                                                        ? theme.accent?.dark?.main || '#7a2639' 
-                                                        : theme.accent?.light?.main || '#9a334d'
-                                                }}>
-                                                Pedido por WhatsApp
-                                            </span>
-                                        </div>
-                                        <p className="mt-2 text-sm"
-                                            style={{ 
-                                                color: isDarkMode 
-                                                    ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                                    : theme.text?.light?.secondary || '#3e3e3e'
                                             }}>
-                                            Al finalizar tu pedido, serás redirigido a WhatsApp para comunicarte directamente con el vendedor.
-                                        </p>
+                                            Pedido por WhatsApp
+                                        </span>
                                     </div>
-                                )}
+                                    <p className="mt-2 text-sm"
+                                        style={{ 
+                                            color: isDarkMode 
+                                                ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                                : theme.text?.light?.secondary || '#3e3e3e'
+                                        }}>
+                                        Al finalizar tu pedido, serás redirigido a WhatsApp para comunicarte directamente con el vendedor.
+                                    </p>
+                                </div>
 
                                 {/* Mensaje para usuario autenticado */}
                                 {isUserAuthenticated && (
@@ -1016,7 +995,12 @@ const CheckoutPage = () => {
                                                 <div className="w-5 h-5 border-t-2 border-white border-r-2 rounded-full animate-spin mr-2"></div>
                                                 Procesando...
                                             </div>
-                                        ) : storeConfig?.view_only ? 'Solicitar por WhatsApp' : 'Finalizar Pedido'}
+                                        ) : 
+                                        <div>
+                                            <span>Solicitar por WhatsApp</span>
+                                            <FaWhatsapp className="inline-block ml-2" />
+                                            
+                                        </div>}
                                     </button>
                                 </div>
                             </form>
@@ -1082,23 +1066,23 @@ const CheckoutPage = () => {
                                                     }}>
                                                     {item.name}
                                                 </h3>
-                                                <div className="text-sm"
+                                                <div className="text-sm text-right"
                                                     style={{ 
                                                         color: isDarkMode 
                                                             ? theme.text?.dark?.secondary || '#e0e0e0' 
                                                             : theme.text?.light?.secondary || '#3e3e3e'
                                                     }}>
-                                                    {item.quantity} x ${item.price.toFixed(2)}
+                                                    {item.quantity} x {formatPrice(item.price)}
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="font-medium"
+                                        <div className="font-medium text-right"
                                             style={{ 
                                                 color: isDarkMode 
                                                     ? theme.text?.dark?.primary || '#ffffff' 
                                                     : theme.text?.light?.primary || '#252525'
                                             }}>
-                                            ${(item.price * item.quantity).toFixed(2)}
+                                            {formatPrice(item.price * item.quantity)}
                                         </div>
                                     </div>
                                 ))}
@@ -1115,27 +1099,15 @@ const CheckoutPage = () => {
                                         }}>
                                         Subtotal
                                     </span>
-                                    <span className="font-medium"
+                                    <span className="font-medium text-right"
                                         style={{ 
                                             color: isDarkMode 
                                                 ? theme.text?.dark?.primary || '#ffffff' 
                                                 : theme.text?.light?.primary || '#252525'
                                         }}>
-                                        ${getTotalPrice().toFixed(2)}
+                                        {formatPrice(getTotalPrice())}
                                     </span>
                                 </div>
-                                
-                                {/* Descuentos o costos adicionales - ejemplo */}
-                                {/*
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="font-medium text-green-600">
-                                        Descuento
-                                    </span>
-                                    <span className="font-medium text-green-600">
-                                        -$10.00
-                                    </span>
-                                </div>
-                                */}
                                 
                                 {/* Total */}
                                 <div className="flex justify-between items-center pt-4 border-t mt-4"
@@ -1152,30 +1124,13 @@ const CheckoutPage = () => {
                                         }}>
                                         Total
                                     </span>
-                                    <span className="text-lg font-bold"
+                                    <span className="text-lg font-bold text-right"
                                         style={{ 
                                             background: theme.primary?.gradient || 'linear-gradient(135deg, #9a334d 0%, #7a2639 100%)', 
                                             WebkitBackgroundClip: 'text', 
                                             WebkitTextFillColor: 'transparent'
                                         }}>
-                                        ${getTotalPrice().toFixed(2)}
-                                    </span>
-                                </div>
-                                
-                                {/* Nota sobre seguridad */}
-                                <div className="mt-6 flex items-center justify-center gap-2 text-sm text-center"
-                                    style={{ 
-                                        color: isDarkMode 
-                                            ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                            : theme.text?.light?.secondary || '#3e3e3e'
-                                    }}>
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                    </svg>
-                                    <span>
-                                        {storeConfig?.view_only 
-                                            ? 'Tus datos están protegidos' 
-                                            : 'Pago seguro garantizado'}
+                                        {formatPrice(getTotalPrice())}
                                     </span>
                                 </div>
                             </div>
@@ -1183,19 +1138,18 @@ const CheckoutPage = () => {
                     </div>
                 </div>
             </div>
+
             {/* Carrito de compras - Solo mostrar si no es view_only */}
-            {!storeConfig?.view_only && (
-                <ShoppingCart
-                    isOpen={isCartOpen}
-                    onClose={() => setIsCartOpen(false)}
-                    cartItems={cart}
-                    isCheckoutPage={true}
-                    onUpdateQuantity={updateQuantity}
-                    onRemoveItem={removeFromCart}
-                    onClearCart={clearCart}
-                />
-            )}
-            
+            <ShoppingCart
+                isOpen={isCartOpen}
+                onClose={() => setIsCartOpen(false)}
+                cartItems={cart}
+                isCheckoutPage={true}
+                onUpdateQuantity={updateQuantity}
+                onRemoveItem={removeFromCart}
+                onClearCart={clearCart}
+            />
+        
             {/* Modal de salida */}
             {showExitModal && (
                 <div className="fixed inset-0 z-50 overflow-hidden transition-all duration-300 ease-in-out">

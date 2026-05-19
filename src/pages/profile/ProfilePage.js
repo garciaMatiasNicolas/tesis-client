@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import SideBar from "../../components/ui/SideBar";
 import Alert from "@/components/ui/Alert";
 import { FaUser, FaStore, FaCog, FaUsers, FaHome, FaList, FaPlus, FaBuilding } from "react-icons/fa";
@@ -8,17 +9,19 @@ import StoreForm from "@/components/store/StoreForm";
 import GeneralSettings from "@/components/profile/Settings";
 import BranchesForm from "@/components/profile/forms/BranchesForm";
 import useApiMethods from "@/hooks/useApiMethods";
+import useUserService from "@/services/userService";
 
 const tabs = [
     { label: "Perfil", icon: <FaUser />, section: "profile" },
     { label: "Tienda", icon: <FaStore />, section: "store" },
     { label: "Sucursales", icon: <FaBuilding />, section: "branches" },
-    { label: "Configuración", icon: <FaCog />, section: "settings" },
 ];
 
-export default function ProfilePage() {
+export default function ProfilePage({sectionParam = "profile"}) {
+    const searchParams = useSearchParams();
     const { getMethod, putMethod, postMethod, deleteMethod } = useApiMethods();
-    const [section, setSection] = useState("profile");
+    const userService = useUserService();
+    const [section, setSection] = useState(sectionParam);
     const [user, setUser] = useState([]); // Usar datos iniciales como objeto
     const [store, setStore] = useState(null);
     const [branches, setBranches] = useState([]); // Usar datos iniciales completos
@@ -37,7 +40,7 @@ export default function ProfilePage() {
     // Función para obtener datos del usuario actual
     const fetchUser = async () => {
         try {
-            const response = await getMethod("/users/me/");
+            const response = await userService.getCurrentUser();
             setUser(response);
         } catch (error) {
             setAlert({
@@ -81,7 +84,7 @@ export default function ProfilePage() {
                 email: userData?.email || '',
             };
 
-            await putMethod(`/users/${user.id}/`, cleanUserData);
+            await userService.updateUser(user.id, cleanUserData);
             
             // Si hay datos de empleado que se pueden modificar, actualizarlos también
             if (userData?.employee_info && userData.employee_info.id) {
@@ -97,7 +100,7 @@ export default function ProfilePage() {
 
                 try {
                     // Actualizar los datos del empleado - ahora solo campos editables
-                    await putMethod(`/employees/${userData.employee_info.id}/`, employeeData);
+                    await userService.updateEmployee(userData.employee_info.id, employeeData);
                 } catch (employeeError) {
                     hasErrors = true;
                     
@@ -144,11 +147,11 @@ export default function ProfilePage() {
     const handleUpdateStore = async (formData) => {
         setSaving(true);
         try {
-            // Verificar si hay un logo para subir
+            // Verificar si hay un logo nuevo (archivo) para subir
             const hasFile = formData.logo instanceof File;
-            let dataToSend = formData;
+            let dataToSend;
 
-            // Si hay un archivo, convertir a FormData
+            // Si hay un archivo nuevo, convertir a FormData
             if (hasFile) {
                 const form = new FormData();
                 Object.keys(formData).forEach(key => {
@@ -157,6 +160,11 @@ export default function ProfilePage() {
                     }
                 });
                 dataToSend = form;
+            } else {
+                // Si no hay archivo nuevo, enviar datos JSON sin el campo logo
+                // (el logo existente se mantiene en el backend)
+                const { logo, ...dataWithoutLogo } = formData;
+                dataToSend = dataWithoutLogo;
             }
 
             if (store?.id) {
@@ -231,7 +239,7 @@ export default function ProfilePage() {
     // Función para obtener usuarios con roles de manager y superadmin
     const fetchManagers = async () => {
         try {
-            const response = await getMethod("/users/");
+            const response = await userService.getAllUsers();
             // Manejar diferentes formatos de respuesta
             const usersList = response.results || response || [];
             // Filtrar solo usuarios con roles manager o superadmin
@@ -274,6 +282,14 @@ export default function ProfilePage() {
 
         loadData();
     }, []);
+    
+    // Efecto para manejar el parámetro de query string "section"
+    useEffect(() => {
+        const sectionFromUrl = searchParams.get('section');
+        if (sectionFromUrl && ['profile', 'store', 'branches'].includes(sectionFromUrl)) {
+            setSection(sectionFromUrl);
+        }
+    }, [searchParams]);
     
     // Efecto para actualizar los nombres de managers en las sucursales cuando cambian los usuarios
     useEffect(() => {
@@ -541,7 +557,6 @@ export default function ProfilePage() {
                                         />
                                         : <div className="bg-white rounded-xl shadow-lg p-4 md:p-8 text-center text-gray-400 text-sm md:text-base">No tienes acceso a sucursales.</div>
                                 )}
-                                {section === "settings" && <GeneralSettings />}
                             </div>
                         </div>
                     </div>

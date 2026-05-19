@@ -46,7 +46,7 @@ const useApiMethods = () => {
                 params,
                 ...config,
             });
-            return isResponseFile ? response : response.data;
+            return response.data;
         } catch (error) {
             console.error("GET request failed:", error);
             throw error;
@@ -67,12 +67,17 @@ const useApiMethods = () => {
                 }
                 config.headers = {
                     'Authorization': `Bearer ${token}`,
-                    'Content-Type': isFile ? 'multipart/form-data' : 'application/json'
+                };
+                
+                // Solo establecer Content-Type si NO es un archivo
+                // Axios establece automáticamente multipart/form-data con el boundary correcto
+                if (!isFile) {
+                    config.headers['Content-Type'] = 'application/json';
                 }
             }
             
             const response = await axios.post(`${environment === "development" ? "http" : "https"}://${hostname}.${apiUrl}${endpoint}`, data, config);
-            return isResponseFile ? response : response.data;
+            return response.data;
         } catch (error) {
             console.error("POST request failed:", error);
             throw error;
@@ -92,9 +97,14 @@ const useApiMethods = () => {
                 config = {
                     headers: {
                         'Authorization': `Bearer ${token}`,
-                        'Content-Type': isFile ? 'multipart/form-data' : 'application/json'
                     }
                 };
+                
+                // Solo establecer Content-Type si NO es un archivo
+                // Axios establece automáticamente multipart/form-data con el boundary correcto
+                if (!isFile) {
+                    config.headers['Content-Type'] = 'application/json';
+                }
             }
 
             const response = await axios.put(`${environment === "development" ? "http" : "https"}://${hostname}.${apiUrl}${endpoint}`, data, config);

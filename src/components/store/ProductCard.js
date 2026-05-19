@@ -93,7 +93,7 @@ const ProductCard = ({ product, onAddToCart, isDarkMode = true, theme }) => {
             {/* Precio */}
             <div className="flex items-center justify-between mb-4 flex-grow">
             <div>
-                <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.accent}} className="text-2xl font-bold">
+                <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.accent}} className="text-2xl font-bold text-right">
                 {formatPrice(product.price)}
                 </span>
             </div>

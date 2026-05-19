@@ -2,15 +2,18 @@
 import React, { useState, useEffect } from 'react';
 import SideBar from '@/components/ui/SideBar';
 import Alert from '@/components/ui/Alert';
+import Pagination from '@/components/ui/Pagination';
 import EmployeeTable from '@/components/employees/EmployeeTable';
 import EmployeeModal from '@/components/employees/EmployeeModal';
 import DeleteConfirmModal from '@/components/employees/DeleteConfirmModal';
 import EmployeeFilters from '@/components/employees/EmployeeFilters';
+import useEmployeeService from '@/services/employeeService';
 import useApiMethods from '@/hooks/useApiMethods';
 import { FaHome, FaUsers, FaList, FaPlus, FaStore } from 'react-icons/fa';
 
 const EmployeesPage = () => {
     const { getMethod, postMethod, putMethod, deleteMethod } = useApiMethods();
+    const employeeService = useEmployeeService();
     
     // Estado principal
     const [employees, setEmployees] = useState([]);
@@ -19,6 +22,12 @@ const EmployeesPage = () => {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    
+    // Estados de paginación
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [totalCount, setTotalCount] = useState(0);
+    const [itemsPerPage] = useState(10);
     
     // Estado del usuario actual
     const [currentUser, setCurrentUser] = useState(null);
@@ -66,13 +75,34 @@ const EmployeesPage = () => {
         }
     };
 
-    const fetchEmployees = async () => {
+    const fetchEmployees = async (page = 1) => {
         try {
-            const response = await getMethod("/employees/");
-            setEmployees(response.results || response || []);
+            setLoading(true);
+            const response = await employeeService.getAllEmployees({
+                page,
+                page_size: itemsPerPage,
+                search: searchTerm,
+                store: selectedStore,
+                branch: selectedBranch
+            });
+            
+            // Manejar respuesta paginada
+            if (response.results) {
+                setEmployees(response.results);
+                setTotalCount(response.count || 0);
+                setTotalPages(Math.ceil((response.count || 0) / itemsPerPage));
+            } else {
+                // Respuesta sin paginación (fallback)
+                setEmployees(response || []);
+                setTotalCount(response?.length || 0);
+                setTotalPages(1);
+            }
         } catch (error) {
-            //console.error("Error obteniendo empleados:", error);
+            console.error("Error obteniendo empleados:", error);
             showAlert('danger', 'Error', 'No se pudieron cargar los empleados');
+            setEmployees([]);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -148,6 +178,13 @@ const EmployeesPage = () => {
     useEffect(() => {
         loadAllData();
     }, []);
+    
+    // Efecto para recargar empleados cuando cambien los filtros o la página
+    useEffect(() => {
+        if (!loading) {
+            fetchEmployees(currentPage);
+        }
+    }, [currentPage, searchTerm, selectedStore, selectedBranch]);
 
     // Handlers para modales
     const handleAddEmployee = () => {
@@ -165,6 +202,23 @@ const EmployeesPage = () => {
         setShowDeleteModal(true);
     };
 
+    // Handlers de paginación
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
+
+    const handlePreviousPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage(currentPage + 1);
+        }
+    };
+    
     // Handler para crear/actualizar empleado
     const handleSubmitEmployee = async (employeeData) => {
         setSaving(true);
@@ -234,22 +288,22 @@ const EmployeesPage = () => {
         }
     };
 
-    // Filtrar empleados basado en los filtros aplicados
-    const filteredEmployees = employees.filter(employee => {
-        const matchesSearch = !searchTerm || 
-            employee.user_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            employee.user_email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            employee.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            employee.dni?.toString().includes(searchTerm);
+    // Resetear a página 1 cuando cambien los filtros
+    const handleSearchChange = (value) => {
+        setSearchTerm(value);
+        setCurrentPage(1);
+    };
 
-        const matchesStore = !selectedStore || 
-            employee.store?.toString() === selectedStore;
+    const handleStoreChange = (value) => {
+        setSelectedStore(value);
+        setSelectedBranch(''); // Limpiar sucursal cuando cambia tienda
+        setCurrentPage(1);
+    };
 
-        const matchesBranch = !selectedBranch || 
-            employee.branch?.toString() === selectedBranch;
-
-        return matchesSearch && matchesStore && matchesBranch;
-    });
+    const handleBranchChange = (value) => {
+        setSelectedBranch(value);
+        setCurrentPage(1);
+    };
 
     // Verificar permisos
     const canAdd = currentUser && ['superadmin', 'manager'].includes(currentUser.role);
@@ -277,29 +331,42 @@ const EmployeesPage = () => {
                     {/* Filtros y búsqueda */}
                     <EmployeeFilters
                         searchTerm={searchTerm}
-                        onSearchChange={setSearchTerm}
+                        onSearchChange={handleSearchChange}
                         selectedStore={selectedStore}
-                        onStoreChange={(value) => {
-                            setSelectedStore(value);
-                            setSelectedBranch(''); // Limpiar sucursal cuando cambia tienda
-                        }}
+                        onStoreChange={handleStoreChange}
                         selectedBranch={selectedBranch}
-                        onBranchChange={setSelectedBranch}
+                        onBranchChange={handleBranchChange}
                         stores={stores}
                         branches={branches}
                         onAddEmployee={handleAddEmployee}
                         canAdd={canAdd}
-                        totalEmployees={filteredEmployees.length}
+                        totalEmployees={totalCount}
                     />
 
                     {/* Tabla de empleados */}
                     <EmployeeTable
-                        employees={filteredEmployees}
+                        employees={employees}
                         onEdit={handleEditEmployee}
                         onDelete={handleDeleteEmployee}
                         loading={loading}
                         userRole={currentUser?.role}
                     />
+                    
+                    {/* Paginación */}
+                    {!loading && employees.length > 0 && (
+                        <div className="mt-6">
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                totalCount={totalCount}
+                                itemsPerPage={itemsPerPage}
+                                onPageChange={handlePageChange}
+                                onPreviousPage={handlePreviousPage}
+                                onNextPage={handleNextPage}
+                                itemName="empleados"
+                            />
+                        </div>
+                    )}
 
                     {/* Modal para agregar/editar empleado */}
                     <EmployeeModal

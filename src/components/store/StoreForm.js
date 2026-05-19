@@ -97,7 +97,7 @@ export default function StoreForm({ store, onChange, onSave, loading = false, re
     );
 
     return (
-        <div className="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-lg p-4 md:p-8">
+        <div className="w-full max-w-4xl mx-auto bg-white rounded-xl p-4 md:p-8">
             <div className="mb-6 md:mb-8">
                 <h2 className="text-xl md:text-2xl font-bold text-[#223263] mb-2">Configuración de la tienda</h2>
                 <p className="text-sm md:text-base text-gray-600">Configura los datos principales de tu tienda</p>

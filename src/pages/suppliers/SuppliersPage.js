@@ -1,18 +1,25 @@
 "use client";
+import React from 'react';
 import SupplierTable from '@/components/suppliers/SupplierTable';
 import SideBar from '@/components/ui/SideBar';
 import Alert from '@/components/ui/Alert';
-import useApiMethods from '@/hooks/useApiMethods';
-import React from 'react'
+import Pagination from '@/components/ui/Pagination';
+import useSupplierService from '@/services/supplierService';
 
 const SuppliersPage = () => {
-    const { postMethod, deleteMethod, getMethod, patchMethod } = useApiMethods();
+    const supplierService = useSupplierService();
     const [suppliers, setSuppliers] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [searchTerm, setSearchTerm] = React.useState("");
     const [showActions, setShowActions] = React.useState(true);
     const [alert, setAlert] = React.useState(null);
+    
+    // Estados de paginación
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const [totalPages, setTotalPages] = React.useState(1);
+    const [totalCount, setTotalCount] = React.useState(0);
+    const [itemsPerPage] = React.useState(10);
 
     // Función para mostrar alertas
     const showAlert = (type, title, message) => {
@@ -23,28 +30,48 @@ const SuppliersPage = () => {
         }
     };
 
-    // Cargar proveedores al montar el componente
+    // Cargar proveedores al montar el componente y cuando cambie la página o filtros
     React.useEffect(() => {
-        loadSuppliers();
-    }, []);
+        loadSuppliers(currentPage);
+    }, [currentPage]);
+    
+    // Resetear a página 1 cuando cambie el término de búsqueda
+    React.useEffect(() => {
+        if (currentPage !== 1) {
+            setCurrentPage(1);
+        } else {
+            loadSuppliers(1);
+        }
+    }, [searchTerm]);
 
-    const loadSuppliers = async () => {
+    const loadSuppliers = async (page = 1) => {
         try {
             setLoading(true);
             setError(null);
             setAlert(null);
-            const response = await getMethod('/suppliers/');
+            const response = await supplierService.getAllSuppliers({
+                page,
+                page_size: itemsPerPage,
+                search: searchTerm
+            });
             
-            // Asegurar que siempre sea un array
-            const suppliersArray = Array.isArray(response) ? response : 
-                                  (response && response.results) ? response.results :
-                                  (response && response.data) ? response.data : [];
-            
-            setSuppliers(suppliersArray);
+            // Manejar respuesta paginada
+            if (response && response.results) {
+                setSuppliers(response.results);
+                setTotalCount(response.count || 0);
+                setTotalPages(Math.ceil((response.count || 0) / itemsPerPage));
+            } else {
+                // Respuesta sin paginación (fallback para compatibilidad)
+                const suppliersArray = Array.isArray(response) ? response : 
+                                      (response && response.data) ? response.data : [];
+                setSuppliers(suppliersArray);
+                setTotalCount(suppliersArray.length);
+                setTotalPages(1);
+            }
         } catch (err) {
             console.error('Error cargando proveedores:', err);
             showAlert('danger', 'Error al cargar proveedores', 'No se pudieron cargar los proveedores. Por favor, intenta nuevamente.');
-            setSuppliers([]); // Asegurar que siempre sea array en caso de error
+            setSuppliers([]);
         } finally {
             setLoading(false);
         }
@@ -56,17 +83,16 @@ const SuppliersPage = () => {
             setLoading(true);
             setError(null);
             setAlert(null);
-            const response = await postMethod('/suppliers/', supplierData);
+            const response = await supplierService.createSupplier(supplierData);
             
             if (response && response.supplier) {
-                // Agregar el nuevo proveedor a la lista
-                setSuppliers(prev => [response.supplier, ...prev]);
                 showAlert('success', 'Proveedor creado', 'El proveedor se ha creado exitosamente.');
+                // Recargar lista actual
+                await loadSuppliers(currentPage);
                 return { success: true, data: response.supplier };
             } else if (response) {
-                // Si la respuesta es directamente el proveedor
-                setSuppliers(prev => [response, ...prev]);
                 showAlert('success', 'Proveedor creado', 'El proveedor se ha creado exitosamente.');
+                await loadSuppliers(currentPage);
                 return { success: true, data: response };
             }
         } catch (err) {
@@ -122,21 +148,15 @@ const SuppliersPage = () => {
             setLoading(true);
             setError(null);
             setAlert(null);
-            const response = await patchMethod(`/suppliers/${supplierId}/`, supplierData);
+            const response = await supplierService.updateSupplier(supplierId, supplierData);
             
             if (response && response.supplier) {
-                // Actualizar el proveedor en la lista
-                setSuppliers(prev => prev.map(s => 
-                    s.id === supplierId ? response.supplier : s
-                ));
                 showAlert('success', 'Proveedor actualizado', 'El proveedor se ha actualizado exitosamente.');
+                await loadSuppliers(currentPage);
                 return { success: true, data: response.supplier };
             } else if (response) {
-                // Si la respuesta es directamente el proveedor
-                setSuppliers(prev => prev.map(s => 
-                    s.id === supplierId ? response : s
-                ));
                 showAlert('success', 'Proveedor actualizado', 'El proveedor se ha actualizado exitosamente.');
+                await loadSuppliers(currentPage);
                 return { success: true, data: response };
             }
         } catch (err) {
@@ -192,11 +212,20 @@ const SuppliersPage = () => {
             setLoading(true);
             setError(null);
             setAlert(null);
-            await deleteMethod(`/suppliers/${supplier.id}/`);
+            await supplierService.deleteSupplier(supplier.id);
             
-            // Eliminar proveedor de la lista
-            setSuppliers(prev => prev.filter(s => s.id !== supplier.id));
             showAlert('success', 'Proveedor eliminado', `El proveedor "${supplier.name}" se ha eliminado exitosamente.`);
+            // Recargar lista actual, o página anterior si esta queda vacía
+            const remainingCount = totalCount - 1;
+            const newTotalPages = Math.ceil(remainingCount / itemsPerPage);
+            const pageToLoad = currentPage > newTotalPages ? Math.max(1, newTotalPages) : currentPage;
+            
+            if (pageToLoad !== currentPage) {
+                setCurrentPage(pageToLoad);
+            } else {
+                await loadSuppliers(currentPage);
+            }
+            
             return { success: true };
         } catch (err) {
             console.error('Error eliminando proveedor:', err);
@@ -223,6 +252,23 @@ const SuppliersPage = () => {
             setLoading(false);
         }
     };
+    
+    // Handlers de paginación
+    const handlePageChange = (page) => {
+        setCurrentPage(page);
+    };
+
+    const handlePreviousPage = () => {
+        if (currentPage > 1) {
+            setCurrentPage(currentPage - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        if (currentPage < totalPages) {
+            setCurrentPage(currentPage + 1);
+        }
+    };
 
     return (
         <div className="flex min-h-screen bg-[#f8fafc]">
@@ -238,8 +284,8 @@ const SuppliersPage = () => {
             
             <SideBar
                 onProfile={() => window.location.href = "/profile"}
-                onSupport={() => alert("Soporte")}
-                onLogout={() => alert("Cerrar sesión")}
+                onSupport={() => showAlert('info', 'Soporte', 'Funcionalidad en desarrollo')}
+                onLogout={() => showAlert('info', 'Logout', 'Funcionalidad en desarrollo')}
             />
             <main className="flex-1 p-4 md:p-8 h-screen overflow-y-auto">
                 <SupplierTable
@@ -252,7 +298,25 @@ const SuppliersPage = () => {
                     searchTerm={searchTerm}
                     onSearchChange={(term) => setSearchTerm(term)}
                     showActions={showActions}
+                    onReload={() => loadSuppliers(currentPage)}
+                    onShowAlert={showAlert}
                 />
+                
+                {/* Paginación */}
+                {!loading && suppliers.length > 0 && (
+                    <div className="mt-6 px-4">
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalCount={totalCount}
+                            itemsPerPage={itemsPerPage}
+                            onPageChange={handlePageChange}
+                            onPreviousPage={handlePreviousPage}
+                            onNextPage={handleNextPage}
+                            itemName="proveedores"
+                        />
+                    </div>
+                )}
             </main>
         </div>
     )

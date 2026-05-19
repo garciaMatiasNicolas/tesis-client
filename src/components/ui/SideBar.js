@@ -221,7 +221,6 @@ export default function SideBar({ user, onSupport }) {
     return (
         <aside
             className={`
-                h-screen
                 bg-white
                 shadow-xl
                 flex flex-col justify-between
@@ -253,7 +252,7 @@ export default function SideBar({ user, onSupport }) {
                     </h1>
                 </div>
             </div>
-            <nav className="flex-1 px-2 py-8">
+            <nav className="flex-1 px-2 py-5">
                 <ul className="space-y-2">
                     {items.map((item, idx) => (
                         <li key={item.label}>
@@ -338,7 +337,7 @@ export default function SideBar({ user, onSupport }) {
             <div className="px-2 py-6 border-t border-gray-100 space-y-2">
                 <Link href="/profile">
                     <button
-                        className="flex items-center w-full px-2 py-2 rounded-md font-medium text-[#223263] hover:bg-[#e6f7f3] transition"
+                        className={`flex items-center w-full px-2 ${expanded ? "py-2" : ""} font-medium text-[#223263] hover:bg-[#e6f7f3] transition`}
                         style={{cursor: "pointer"}}
                     >
                         <span className="text-xl flex-shrink-0">
@@ -355,24 +354,7 @@ export default function SideBar({ user, onSupport }) {
                     </button>
                 </Link>
                 <button
-                    className="flex items-center w-full px-2 py-2 rounded-md font-medium text-[#223263] hover:bg-[#e6f7f3] transition"
-                    onClick={onSupport}
-                    style={{cursor: "pointer"}}
-                >
-                    <span className="text-xl flex-shrink-0">
-                        <FaHeadset />
-                    </span>
-                    <span
-                        className={`
-                            ml-3 transition-all duration-300
-                            ${expanded ? "opacity-100" : "opacity-0 w-0 overflow-hidden"}
-                        `}
-                    >
-                        Contactar a soporte
-                    </span>
-                </button>
-                <button
-                    className="flex items-center w-full px-2 py-2 rounded-md font-medium text-[#223263] hover:bg-[#e6f7f3] transition"
+                    className={`flex items-center w-full px-2 ${expanded ? "py-2" : ""} font-medium text-[#223263] hover:bg-[#e6f7f3] transition`}
                     onClick={onLogout}
                     style={{cursor: "pointer"}}
                 >

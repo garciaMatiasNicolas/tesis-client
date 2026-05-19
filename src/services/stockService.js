@@ -2,7 +2,7 @@ import useApiMethods from '@/hooks/useApiMethods';
 
 // Service para manejar operaciones relacionadas con stock
 const useStockService = () => {
-    const { getMethod, postMethod } = useApiMethods();
+    const { getMethod, postMethod, patchMethod } = useApiMethods();
 
     const stockService = {
         // Obtener todo el stock
@@ -14,6 +14,9 @@ const useStockService = () => {
                 if (filters.warehouse) params.append('warehouse', filters.warehouse);
                 if (filters.branch) params.append('branch', filters.branch);
                 if (filters.low_stock) params.append('low_stock', 'true');
+                if (filters.page) params.append('page', filters.page);
+                if (filters.page_size) params.append('page_size', filters.page_size);
+                if (filters.search) params.append('search', filters.search);
                 
                 const queryString = params.toString();
                 const url = queryString ? `/stock/?${queryString}` : '/stock/';
@@ -179,6 +182,55 @@ const useStockService = () => {
                 return response;
             } catch (error) {
                 console.error('Error al crear movimiento interno:', error);
+                throw error;
+            }
+        },
+
+        // Actualizar estado de movimiento interno
+        updateMovementStatus: async (movementId, status) => {
+            try {
+                const response = await patchMethod(`/stock-movements/${movementId}/`, { status });
+                return response;
+            } catch (error) {
+                console.error('Error al actualizar estado del movimiento:', error);
+                throw error;
+            }
+        },
+
+        // ============ EXPORT ============
+        
+        // Descargar plantilla de ajuste de stock (Excel)
+        exportTemplate: async () => {
+            try {
+                const response = await getMethod('/stock/export_template/', {}, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al descargar plantilla de stock:', error);
+                throw error;
+            }
+        },
+
+        // Exportar datos actuales de stock a CSV
+        exportData: async () => {
+            try {
+                const response = await getMethod('/stock/export/', {}, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al exportar stock:', error);
+                throw error;
+            }
+        },
+
+        // Importar ajustes de stock desde archivo Excel
+        importData: async (file) => {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                const response = await postMethod('/stock/import_data/', formData, true, true);
+                return response;
+            } catch (error) {
+                console.error('Error al importar ajustes de stock:', error);
                 throw error;
             }
         }

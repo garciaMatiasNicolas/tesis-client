@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import useEcommerceService from '@/services/ecommerceService';
 import { useCart } from '@/hooks/useCart';
@@ -31,6 +31,41 @@ export default function ProductDetailPage() {
     const [imageError, setImageError] = useState(false);
     const [showLightbox, setShowLightbox] = useState(false);
     const [imageLoading, setImageLoading] = useState(true);
+    const [hasTransparency, setHasTransparency] = useState(false);
+
+    // Construir array de imágenes - debe estar antes de useEffects que lo usan
+    const images = useMemo(() => {
+        if (!product) return [];
+        
+        const processUrl = (url) => {
+            if (!url || imageError) return null;
+            return String(url);
+        };
+        
+        const productImages = [];
+        if (product.images && Array.isArray(product.images)) {
+            product.images.forEach(img => {
+                const processed = processUrl(img);
+                if (processed) productImages.push(processed);
+            });
+        } else {
+            // Fallback: construir desde image_1, image_2, image_3
+            const img1 = processUrl(product.image_1);
+            const img2 = processUrl(product.image_2);
+            const img3 = processUrl(product.image_3);
+            const imgMain = processUrl(product.image);
+            
+            if (img1) productImages.push(img1);
+            if (img2) productImages.push(img2);
+            if (img3) productImages.push(img3);
+            // Si no hay nada, usar image
+            if (productImages.length === 0 && imgMain) {
+                productImages.push(imgMain);
+            }
+        }
+        
+        return productImages.filter(img => img && img !== null && img !== 'null' && img !== '');
+    }, [product, imageError]);
 
     useEffect(() => {
         setMounted(true);
@@ -44,17 +79,21 @@ export default function ProductDetailPage() {
 
     // Reset image loading cuando cambia la imagen seleccionada
     useEffect(() => {
-        setImageLoading(true);
-        console.log('Selected image changed to:', selectedImage);
-        
+        setImageLoading(true);        
         // Timeout de seguridad para evitar que la imagen se quede cargando eternamente
         const loadTimeout = setTimeout(() => {
-            console.log('Image load timeout - forcing imageLoading to false');
             setImageLoading(false);
         }, 3000);
         
         return () => clearTimeout(loadTimeout);
     }, [selectedImage]);
+
+    // Detectar transparencia cuando cambia la imagen o cuando se carga el producto
+    useEffect(() => {
+        if (images.length > 0 && images[selectedImage]) {
+            checkImageTransparency(images[selectedImage]);
+        }
+    }, [selectedImage, images]);
 
     // Prevenir scroll cuando el lightbox está abierto
     useEffect(() => {
@@ -92,14 +131,6 @@ export default function ProductDetailPage() {
             setImageLoading(true);
             setSelectedImage(0); // Reset a la primera imagen
             const data = await getProductById(productId);
-            console.log('Product data loaded:', data);
-            console.log('Images:', {
-                images: data.images,
-                image_1: data.image_1,
-                image_2: data.image_2,
-                image_3: data.image_3,
-                image: data.image
-            });
             setProduct(data);
             setImageError(false); // Reset error state
         } catch (error) {
@@ -116,6 +147,51 @@ export default function ProductDetailPage() {
 
     const handleImageLoad = () => {
         setImageLoading(false);
+    };
+
+    // Detectar si la imagen tiene transparencia (canal alpha)
+    const checkImageTransparency = (imgSrc) => {
+        // Solo verificar para archivos PNG
+        if (!imgSrc || !imgSrc.toLowerCase().includes('.png')) {
+            setHasTransparency(false);
+            return;
+        }
+
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        img.src = imgSrc;
+        
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                
+                // Verificar si hay píxeles con alpha < 255 (transparentes o semitransparentes)
+                let foundTransparency = false;
+                for (let i = 3; i < data.length; i += 4) {
+                    if (data[i] < 255) {
+                        foundTransparency = true;
+                        break;
+                    }
+                }
+                
+                setHasTransparency(foundTransparency);
+            } catch (error) {
+                // Si hay error de CORS o cualquier otro, asumir que no tiene transparencia
+                console.warn('Could not check transparency:', error);
+                setHasTransparency(false);
+            }
+        };
+        
+        img.onerror = () => {
+            setHasTransparency(false);
+        };
     };
 
     const getOptimizedImageUrl = (url, isLightbox = false) => {
@@ -208,45 +284,7 @@ export default function ProductDetailPage() {
     const isOutOfStock = product.stock === false;
     const hasValidImage = product.image && !imageError;
     const optimizedImageUrl = getOptimizedImageUrl(product.image);
-    
-    // Construir array de imágenes desde el producto
-    const productImages = [];
-    if (product.images && Array.isArray(product.images)) {
-        product.images.forEach(img => {
-            if (img) productImages.push(getOptimizedImageUrl(img));
-        });
-    } else {
-        // Fallback: construir desde image_1, image_2, image_3
-        if (product.image_1) productImages.push(getOptimizedImageUrl(product.image_1));
-        if (product.image_2) productImages.push(getOptimizedImageUrl(product.image_2));
-        if (product.image_3) productImages.push(getOptimizedImageUrl(product.image_3));
-        // Si no hay nada, usar image
-        if (productImages.length === 0 && product.image) {
-            productImages.push(getOptimizedImageUrl(product.image));
-        }
-    }
-    
-    console.log('Building productImages:', {
-        hasImagesArray: product.images && Array.isArray(product.images),
-        imagesArray: product.images,
-        image_1: product.image_1,
-        image_2: product.image_2,
-        image_3: product.image_3,
-        image: product.image,
-        productImages: productImages
-    });
-    
-    const images = productImages.filter(img => img && img !== null && img !== 'null' && img !== '');
     const hasImages = images.length > 0;
-    
-    console.log('Product images array:', { 
-        productImages, 
-        images, 
-        hasImages, 
-        selectedImage,
-        currentImageUrl: images[selectedImage],
-        allImageUrls: images
-    });
 
     return (
         <div 
@@ -323,12 +361,15 @@ export default function ProductDetailPage() {
                                             src={images[selectedImage]}
                                             alt={product.description}
                                             className={`w-full h-full object-contain transition-all duration-500 ${imageLoading ? 'opacity-0' : 'opacity-100'} ${isOutOfStock ? 'grayscale opacity-60' : 'group-hover:scale-105'}`}
+                                            style={{
+                                                backgroundColor: hasTransparency 
+                                                    ? (isDarkMode ? theme.background.dark.elevated : theme.background.light.elevated)
+                                                    : 'transparent'
+                                            }}
                                             onError={(e) => {
-                                                console.error('Error loading main image:', selectedImage, images[selectedImage]);
                                                 handleImageError();
                                             }}
                                             onLoad={() => {
-                                                console.log('Image loaded successfully:', selectedImage, images[selectedImage]);
                                                 handleImageLoad();
                                             }}
                                             loading="eager"
@@ -407,7 +448,6 @@ export default function ProductDetailPage() {
                                     <button
                                         key={idx}
                                         onClick={() => {
-                                            console.log('Clicking thumbnail', idx, 'Current:', selectedImage);
                                             setSelectedImage(idx);
                                         }}
                                         className="relative rounded-lg overflow-hidden aspect-square transition-all duration-200 hover:scale-105"
@@ -462,7 +502,7 @@ export default function ProductDetailPage() {
                             <p className="text-sm mb-2" style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}>
                                 Precio
                             </p>
-                            <div className="flex items-baseline gap-2">
+                            <div className="flex items-baseline text-right gap-2">
                                 <span 
                                     className="text-5xl font-bold"
                                     style={{ color: theme.primary.main }}
@@ -605,7 +645,11 @@ export default function ProductDetailPage() {
                             alt={product.description}
                             className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
                             style={{
-                                filter: isOutOfStock ? 'grayscale(100%)' : 'none'
+                                filter: isOutOfStock ? 'grayscale(100%)' : 'none',
+                                backgroundColor: hasTransparency 
+                                    ? (isDarkMode ? theme.background.dark.elevated : theme.background.light.elevated)
+                                    : 'transparent',
+                                padding: hasTransparency ? '2rem' : '0'
                             }}
                             onError={(e) => {
                                 console.error('Error loading lightbox image:', images[selectedImage]);

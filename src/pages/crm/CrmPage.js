@@ -132,11 +132,9 @@ const CrmPage = () => {
             if (editingCustomer) {
                 // Actualizar cliente existente
                 result = await crmService.updateCustomer(editingCustomer.id, customerData);
-                console.log("Cliente actualizado exitosamente:", result);
             } else {
                 // Crear nuevo cliente
                 result = await crmService.createCustomer(customerData);
-                console.log("Cliente creado exitosamente:", result);
             }
             
             // Recargar la lista de clientes
@@ -231,7 +229,6 @@ const CrmPage = () => {
             // Recargar la lista de clientes
             await loadCustomers();
             
-            console.log("Cliente actualizado exitosamente:", updatedCustomer);
         } catch (err) {
             console.error('Error updating customer:', err);
             setError('Error al actualizar el cliente. Por favor, intenta nuevamente.');
@@ -248,7 +245,6 @@ const CrmPage = () => {
             // Recargar la lista de clientes para mostrar el nuevo contacto
             await loadCustomers();
             
-            console.log("Contacto agregado exitosamente:", response);
             return response;
         } catch (err) {
             console.error('Error adding contact:', err);

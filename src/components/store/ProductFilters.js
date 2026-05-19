@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 const ProductFilters = ({ 
     categories = [], 
     subcategories = [], 
     suppliers = [],
     onFiltersChange,
-    onClearFilters, 
+    onClearFilters,
     isDarkMode,
-    theme 
+    theme,
+    isMobile = false
 }) => {
     const [filters, setFilters] = useState({
         categories: [],
@@ -18,10 +19,17 @@ const ProductFilters = ({
         search: ''
     });
 
+    const [priceRange, setPriceRange] = useState({
+        min: 0,
+        max: 1000000,
+        currentMin: '',
+        currentMax: ''
+    });
+
     const [expandedSections, setExpandedSections] = useState({
         categories: true,
-        subcategories: false,
-        suppliers: false,
+        subcategories: true,
+        suppliers: true,
         price: true
     });
 
@@ -77,31 +85,37 @@ const ProductFilters = ({
     );
 
     const getActiveFiltersCount = () => {
-        return filters.categories.length + filters.subcategories.length + filters.suppliers.length + 
-               (filters.minPrice ? 1 : 0) + (filters.maxPrice ? 1 : 0) + (filters.search ? 1 : 0);
+        let count = filters.categories.length + filters.subcategories.length + filters.suppliers.length;
+        // Contar rango de precio como 1 filtro si hay min o max
+        if (filters.minPrice || filters.maxPrice) {
+            count += 1;
+        }
+        return count;
     };
 
     return (
-        <div className="w-80 rounded-lg shadow-lg border backdrop-blur-sm sticky top-4" style={{background: isDarkMode ? theme.background.dark.main : theme.background.light.main, borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}>
+        <div className={isMobile ? "" : "w-80 rounded-lg border sticky top-4"} style={{
+            backgroundColor: isMobile ? 'transparent' : (isDarkMode ? theme.background?.dark?.card : theme.background?.light?.card),
+            borderColor: isMobile ? 'transparent' : (isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main)
+        }}>
             {/* Header */}
-            <div className="p-4 border-b" style={{background: theme.primary.dark, borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}>
+            <div className="p-4 border-b rounded-lg" style={{
+                backgroundColor: isDarkMode ? theme.background?.dark?.card : theme.background?.light?.card,
+                borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
+            }}>
                 <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold flex items-center" style={{color: theme.text.dark.primary}}>
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{color: theme.text.dark.primary}}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.207A1 1 0 013 6.5V4z" />
-                        </svg>
-                        Filtros
-                        {getActiveFiltersCount() > 0 && (
-                            <span style={{ background: theme.primary.gradient }} className="ml-2 text-white text-xs px-2 py-1 rounded-full shadow-sm">
-                                {getActiveFiltersCount()}
-                            </span>
-                        )}
+                    <h3 className="text-lg font-semibold" style={{
+                        color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                    }}>
+                        Filtros {getActiveFiltersCount() > 0 && `(${getActiveFiltersCount()})`}
                     </h3>
                     {hasActiveFilters && (
                         <button
                             onClick={handleClearAll}
-                            className="text-sm transition-colors font-medium"
-                            style={{color: isDarkMode ? theme.text.dark.accent : theme.text.light.accent}}
+                            className="text-sm font-medium transition-colors hover:opacity-80 cursor-pointer"
+                            style={{
+                                color: theme.primary?.main
+                            }}
                         >
                             Limpiar
                         </button>
@@ -110,19 +124,28 @@ const ProductFilters = ({
             </div>
 
             {/* Búsqueda */}
-            <div className="p-4 border-b" style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}>
+            <div className="p-4 border-b rounded-lg" style={{
+                backgroundColor: isDarkMode ? theme.background?.dark?.card : theme.background?.light?.card,
+                borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
+            }}>
                 <div className="relative">
                     <input
                         type="text"
                         placeholder="Buscar productos..."
                         value={filters.search}
                         onChange={(e) => handleSearchChange(e.target.value)}
-                        style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main, backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}}
-                        className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:border-transparent transition-all"
+                        className="w-full pl-9 pr-4 py-2 border rounded-lg focus:ring-2 transition-all"
+                        style={{
+                            backgroundColor: isDarkMode ? theme.background?.dark?.main : theme.background?.light?.main,
+                            borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main,
+                            color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                        }}
                     />
                     <svg 
                         className="absolute left-3 top-2.5 w-4 h-4"
-                        style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
+                        style={{
+                            color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                        }}
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -134,156 +157,114 @@ const ProductFilters = ({
 
             {/* Filtros activos */}
             {hasActiveFilters && (
-                <div className="p-4 border-b" style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}>
-                    <h4 style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="text-sm font-medium mb-2">Filtros aplicados:</h4>
-                    <div className="flex flex-wrap gap-1">
-                        {filters.search && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs" style={{backgroundColor: isDarkMode ? theme.primary.light : theme.primary.light, color: isDarkMode ? theme.text.dark.accent : theme.text.light.accent}}>
-                                "{filters.search}"
-                                <button 
-                                    onClick={() => handleSearchChange('')}
-                                    className="ml-1"
-                                >
-                                    ×
-                                </button>
-                            </span>
-                        )}
+                <div className="p-4 border-b rounded-lg" style={{
+                    backgroundColor: isDarkMode ? theme.background?.dark?.card : theme.background?.light?.card,
+                    borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
+                }}>
+                    <div className="flex flex-wrap gap-2">
                         {filters.categories.map(catId => {
                             const cat = categories.find(c => c.id.toString() === catId.toString());
                             return cat ? (
-                                <span key={catId} className="inline-flex items-center px-2 py-1 rounded-full text-xs" style={{backgroundColor: theme.primary.dark, color: theme.text.dark.primary}}>
+                                <button
+                                    key={catId}
+                                    onClick={() => handleCheckboxChange('categories', catId)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:opacity-80 border cursor-pointer"
+                                    style={{
+                                        backgroundColor: theme.primary?.main,
+                                        color: '#ffffff',
+                                        borderColor: theme.primary?.main
+                                    }}
+                                >
                                     {cat.name}
-                                    <button 
-                                        onClick={() => handleCheckboxChange('categories', catId)}
-                                        className="ml-1"
-                                    >
-                                        ×
-                                    </button>
-                                </span>
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
                             ) : null;
                         })}
                         {filters.subcategories.map(subId => {
                             const sub = subcategories.find(s => s.id.toString() === subId.toString());
                             return sub ? (
-                                <span key={subId} className="inline-flex items-center px-2 py-1 rounded-full text-xs" style={{backgroundColor: theme.secondary.dark, color: theme.text.dark.primary}}>
+                                <button
+                                    key={subId}
+                                    onClick={() => handleCheckboxChange('subcategories', subId)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:opacity-80 border cursor-pointer"
+                                    style={{
+                                        backgroundColor: theme.primary?.main,
+                                        color: '#ffffff',
+                                        borderColor: theme.primary?.main
+                                    }}
+                                >
                                     {sub.name}
-                                    <button 
-                                        onClick={() => handleCheckboxChange('subcategories', subId)}
-                                        className="ml-1"
-                                    >
-                                        ×
-                                    </button>
-                                </span>
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
                             ) : null;
                         })}
                         {filters.suppliers.map(suppId => {
                             const supp = suppliers.find(s => s.id.toString() === suppId.toString());
                             return supp ? (
-                                <span key={suppId} className="inline-flex items-center px-2 py-1 rounded-full text-xs" style={{backgroundColor: theme.primary.main, color: theme.text.dark.primary}}>
+                                <button
+                                    key={suppId}
+                                    onClick={() => handleCheckboxChange('suppliers', suppId)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:opacity-80 border cursor-pointer"
+                                    style={{
+                                        backgroundColor: theme.primary?.main,
+                                        color: '#ffffff',
+                                        borderColor: theme.primary?.main
+                                    }}
+                                >
                                     {supp.name}
-                                    <button 
-                                        onClick={() => handleCheckboxChange('suppliers', suppId)}
-                                        className="ml-1"
-                                    >
-                                        ×
-                                    </button>
-                                </span>
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
                             ) : null;
                         })}
+                        {(filters.minPrice || filters.maxPrice) && (
+                            <button
+                                onClick={() => {
+                                    const newFilters = { ...filters, minPrice: '', maxPrice: '' };
+                                    setFilters(newFilters);
+                                    onFiltersChange(newFilters);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all hover:opacity-80 border cursor-pointer"
+                                style={{
+                                    backgroundColor: theme.primary?.main,
+                                    color: '#ffffff',
+                                    borderColor: theme.primary?.main
+                                }}
+                            >
+                                ${filters.minPrice ? Number(filters.minPrice).toLocaleString('es-AR') : '0'} - ${filters.maxPrice ? Number(filters.maxPrice).toLocaleString('es-AR') : '∞'}
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
 
-            <div className="h-full overflow-y-auto">
-                {/* Categorías */}
-                <div className="border-b" style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}>
-                    <button
-                        onClick={() => toggleSection('categories')}
-                        className="w-full p-4 text-left flex items-center justify-between transition-colors"
-                        style={{cursor: "pointer"}}
-                    >
-                        <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="font-medium">Categorías</span>
-                        <svg 
-                            className={`w-4 h-4 transform transition-transform ${
-                                expandedSections.categories ? 'rotate-180' : ''
-                            }`}
-                            style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
-                            fill="none" 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.categories && (
-                        <div className="px-4 pb-4 space-y-2">
-                            {categories.map((category) => (
-                                <label key={category.id} className="flex items-center space-x-2 cursor-pointer p-1 rounded">
-                                    <input
-                                        type="checkbox"
-                                        checked={filters.categories.includes(category.id.toString())}
-                                        onChange={() => handleCheckboxChange('categories', category.id.toString())}
-                                        style={{backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}
-                                        className="rounded focus:ring-opacity-50"
-                                    />
-                                    <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="text-sm">{category.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Subcategorías */}
-                <div className="border-b" style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}>
-                    <button
-                        onClick={() => toggleSection('subcategories')}
-                        className="w-full p-4 text-left flex items-center justify-between transition-colors"
-                        style={{cursor: "pointer"}}
-                    >
-                        <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="font-medium">Subcategorías</span>
-                        <svg 
-                            className={`w-4 h-4 transform transition-transform ${
-                                expandedSections.subcategories ? 'rotate-180' : ''
-                            }`}
-                            style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
-                            fill="none" 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
-                        >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.subcategories && (
-                        <div className="px-4 pb-4 space-y-2">
-                            {subcategories.map((subcategory) => (
-                                <label key={subcategory.id} className="flex items-center space-x-2 cursor-pointer p-1 rounded">
-                                    <input
-                                        type="checkbox"
-                                        checked={filters.subcategories.includes(subcategory.id.toString())}
-                                        onChange={() => handleCheckboxChange('subcategories', subcategory.id.toString())}
-                                        style={{backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}
-                                        className="rounded focus:ring-opacity-50"
-                                    />
-                                    <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="text-sm">{subcategory.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
+            <div className="max-h-[calc(100vh-200px)] overflow-y-auto">
                 {/* Precio */}
-                <div className="border-b" style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}>
+                <div className="border-b" style={{
+                    borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
+                }}>
                     <button
                         onClick={() => toggleSection('price')}
-                        className="w-full p-4 text-left flex items-center justify-between transition-colors"
-                        style={{cursor: "pointer"}}
+                        className="w-full p-4 text-left flex items-center justify-between hover:opacity-80 transition-all cursor-pointer"
                     >
-                        <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="font-medium">Precio</span>
+                        <span className="font-medium" style={{
+                            color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                        }}>Precio</span>
                         <svg 
-                            className={`w-4 h-4 transform transition-transform ${
+                            className={`w-5 h-5 transform transition-transform ${
                                 expandedSections.price ? 'rotate-180' : ''
                             }`}
-                            style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
+                            style={{
+                                color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                            }}
                             fill="none" 
                             stroke="currentColor" 
                             viewBox="0 0 24 24"
@@ -292,33 +273,209 @@ const ProductFilters = ({
                         </svg>
                     </button>
                     {expandedSections.price && (
-                        <div className="px-4 pb-4 space-y-3">
-                            <div>
-                                <label style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="block text-sm mb-1">Desde</label>
-                                <input
-                                    type="number"
-                                    placeholder="$0"
-                                    min="0"
-                                    step="0.01"
-                                    value={filters.minPrice}
-                                    onChange={(e) => handlePriceChange('minPrice', e.target.value)}
-                                    style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main, backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}}
-                                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:border-transparent"
-                                />
+                        <div className="px-4 pb-4 space-y-4">
+                            {/* Mostrar rango actual */}
+                            <div className="flex items-center justify-between text-sm">
+                                <div>
+                                    <span className="text-xs block mb-1" style={{
+                                        color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                                    }}>Desde</span>
+                                    <div className="font-semibold" style={{
+                                        color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                                    }}>$ {Number(filters.minPrice || 0).toLocaleString('es-AR')}</div>
+                                </div>
+                                <span className="text-lg" style={{
+                                    color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                                }}>-</span>
+                                <div>
+                                    <span className="text-xs block mb-1" style={{
+                                        color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                                    }}>Hasta</span>
+                                    <div className="font-semibold" style={{
+                                        color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                                    }}>{filters.maxPrice ? `$ ${Number(filters.maxPrice).toLocaleString('es-AR')}` : '$ ∞'}</div>
+                                </div>
                             </div>
-                            <div>
-                                <label style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="block text-sm mb-1">Hasta</label>
-                                <input
-                                    type="number"
-                                    placeholder="$999999"
-                                    min="0"
-                                    step="0.01"
-                                    value={filters.maxPrice}
-                                    onChange={(e) => handlePriceChange('maxPrice', e.target.value)}
-                                    style={{borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main, backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}}
-                                    className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:border-transparent"
-                                />
+
+                            {/* Deslizadores de rango */}
+                            <div className="space-y-3">
+                                <div className="relative">
+                                    <label className="text-xs mb-1 block" style={{
+                                        color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                                    }}>Precio mínimo</label>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="1000000"
+                                        step="10000"
+                                        value={filters.minPrice || 0}
+                                        onChange={(e) => handlePriceChange('minPrice', e.target.value)}
+                                        className="w-full cursor-pointer"
+                                        style={{
+                                            accentColor: theme.primary?.main,
+                                            background: `linear-gradient(to right, ${theme.primary?.main} 0%, ${theme.primary?.main} ${((filters.minPrice || 0) / 1000000) * 100}%, ${isDarkMode ? '#374151' : '#e5e7eb'} ${((filters.minPrice || 0) / 1000000) * 100}%, ${isDarkMode ? '#374151' : '#e5e7eb'} 100%)`
+                                        }}
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <label className="text-xs mb-1 block" style={{
+                                        color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                                    }}>Precio máximo</label>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="1000000"
+                                        step="10000"
+                                        value={filters.maxPrice || 1000000}
+                                        onChange={(e) => handlePriceChange('maxPrice', e.target.value)}
+                                        className="w-full cursor-pointer"
+                                        style={{
+                                            accentColor: theme.primary?.main,
+                                            background: `linear-gradient(to right, ${isDarkMode ? '#374151' : '#e5e7eb'} 0%, ${isDarkMode ? '#374151' : '#e5e7eb'} ${((filters.maxPrice || 1000000) / 1000000) * 100}%, ${theme.primary?.main} ${((filters.maxPrice || 1000000) / 1000000) * 100}%, ${theme.primary?.main} 100%)`
+                                        }}
+                                    />
+                                </div>
                             </div>
+
+                            {/* Inputs manuales opcionales */}
+                            <details className="group">
+                                <summary className="text-sm font-medium cursor-pointer hover:opacity-80 transition-all list-none flex items-center justify-between" style={{
+                                    color: theme.primary?.main
+                                }}>
+                                    <span>Ingresar valores manualmente</span>
+                                    <svg className="w-4 h-4 transform group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </summary>
+                                <div className="flex gap-2 mt-3">
+                                    <div className="flex-1">
+                                        <input
+                                            type="number"
+                                            placeholder="Mín"
+                                            min="0"
+                                            step="1000"
+                                            value={filters.minPrice || ''}
+                                            onChange={(e) => handlePriceChange('minPrice', e.target.value)}
+                                            className="w-full px-2 py-1.5 text-sm border rounded-md focus:ring-2 transition-all"
+                                            style={{
+                                                backgroundColor: isDarkMode ? theme.background?.dark?.main : theme.background?.light?.main,
+                                                borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main,
+                                                color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="flex-1">
+                                        <input
+                                            type="number"
+                                            placeholder="Máx"
+                                            min="0"
+                                            step="1000"
+                                            value={filters.maxPrice || ''}
+                                            onChange={(e) => handlePriceChange('maxPrice', e.target.value)}
+                                            className="w-full px-2 py-1.5 text-sm border rounded-md focus:ring-2 transition-all"
+                                            style={{
+                                                backgroundColor: isDarkMode ? theme.background?.dark?.main : theme.background?.light?.main,
+                                                borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main,
+                                                color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </details>
+                        </div>
+                    )}
+                </div>
+
+                {/* Categorías */}
+                <div className="border-b" style={{
+                    borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
+                }}>
+                    <button
+                        onClick={() => toggleSection('categories')}
+                        className="w-full p-4 text-left flex items-center justify-between hover:opacity-80 transition-all cursor-pointer"
+                    >
+                        <span className="font-medium" style={{
+                            color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                        }}>Categorías</span>
+                        <svg 
+                            className={`w-5 h-5 transform transition-transform ${
+                                expandedSections.categories ? 'rotate-180' : ''
+                            }`}
+                            style={{
+                                color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                            }}
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {expandedSections.categories && (
+                        <div className="px-4 pb-4 space-y-2.5">
+                            {categories.map((category) => (
+                                <label key={category.id} className="flex items-center space-x-3 cursor-pointer hover:opacity-80 p-2 rounded transition-all">
+                                    <input
+                                        type="checkbox"
+                                        checked={filters.categories.includes(category.id.toString())}
+                                        onChange={() => handleCheckboxChange('categories', category.id.toString())}
+                                        className="w-4 h-4 rounded focus:ring-2"
+                                        style={{
+                                            accentColor: theme.primary?.main
+                                        }}
+                                    />
+                                    <span className="text-sm" style={{
+                                        color: isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary
+                                    }}>{category.name}</span>
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Subcategorías */}
+                <div className="border-b" style={{
+                    borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
+                }}>
+                    <button
+                        onClick={() => toggleSection('subcategories')}
+                        className="w-full p-4 text-left flex items-center justify-between hover:opacity-80 transition-all cursor-pointer"
+                    >
+                        <span className="font-medium" style={{
+                            color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                        }}>Subcategorías</span>
+                        <svg 
+                            className={`w-5 h-5 transform transition-transform ${
+                                expandedSections.subcategories ? 'rotate-180' : ''
+                            }`}
+                            style={{
+                                color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                            }}
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {expandedSections.subcategories && (
+                        <div className="px-4 pb-4 space-y-2.5">
+                            {subcategories.map((subcategory) => (
+                                <label key={subcategory.id} className="flex items-center space-x-3 cursor-pointer hover:opacity-80 p-2 rounded transition-all">
+                                    <input
+                                        type="checkbox"
+                                        checked={filters.subcategories.includes(subcategory.id.toString())}
+                                        onChange={() => handleCheckboxChange('subcategories', subcategory.id.toString())}
+                                        className="w-4 h-4 rounded focus:ring-2"
+                                        style={{
+                                            accentColor: theme.primary?.main
+                                        }}
+                                    />
+                                    <span className="text-sm" style={{
+                                        color: isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary
+                                    }}>{subcategory.name}</span>
+                                </label>
+                            ))}
                         </div>
                     )}
                 </div>
@@ -327,15 +484,18 @@ const ProductFilters = ({
                 <div>
                     <button
                         onClick={() => toggleSection('suppliers')}
-                        className="w-full p-4 text-left flex items-center justify-between transition-colors"
-                        style={{cursor: "pointer"}}
+                        className="w-full p-4 text-left flex items-center justify-between hover:opacity-80 transition-all cursor-pointer"
                     >
-                        <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="font-medium">Proveedores</span>
+                        <span className="font-medium" style={{
+                            color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                        }}>Proveedores</span>
                         <svg 
-                            className={`w-4 h-4 transform transition-transform ${
+                            className={`w-5 h-5 transform transition-transform ${
                                 expandedSections.suppliers ? 'rotate-180' : ''
                             }`}
-                            style={{color: isDarkMode ? theme.text.dark.muted : theme.text.light.muted}}
+                            style={{
+                                color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                            }}
                             fill="none" 
                             stroke="currentColor" 
                             viewBox="0 0 24 24"
@@ -344,17 +504,21 @@ const ProductFilters = ({
                         </svg>
                     </button>
                     {expandedSections.suppliers && (
-                        <div className="px-4 pb-4 space-y-2">
+                        <div className="px-4 pb-4 space-y-2.5">
                             {suppliers.map((supplier) => (
-                                <label key={supplier.id} className="flex items-center space-x-2 cursor-pointer p-1 rounded">
+                                <label key={supplier.id} className="flex items-center space-x-3 cursor-pointer hover:opacity-80 p-2 rounded transition-all">
                                     <input
                                         type="checkbox"
                                         checked={filters.suppliers.includes(supplier.id.toString())}
                                         onChange={() => handleCheckboxChange('suppliers', supplier.id.toString())}
-                                        style={{backgroundColor: isDarkMode ? theme.background.dark.card : theme.background.light.card, borderColor: isDarkMode ? theme.border.dark.main : theme.border.light.main}}
-                                        className="rounded focus:ring-opacity-50"
+                                        className="w-4 h-4 rounded focus:ring-2"
+                                        style={{
+                                            accentColor: theme.primary?.main
+                                        }}
                                     />
-                                    <span style={{color: isDarkMode ? theme.text.dark.primary : theme.text.light.primary}} className="text-sm">{supplier.name}</span>
+                                    <span className="text-sm" style={{
+                                        color: isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary
+                                    }}>{supplier.name}</span>
                                 </label>
                             ))}
                         </div>
