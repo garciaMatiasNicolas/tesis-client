@@ -1,4 +1,4 @@
-import StockPage from '@/pages/inventory/stock/StockPage';
+import StockPage from '@/components/pages/inventory/stock/StockPage';
 import ProtectedRoute from '@/services/ProtectedRoute';
 
 const page = () => {

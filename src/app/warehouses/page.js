@@ -1,5 +1,5 @@
+import WarehousePage from '@/components/pages/warehouse/WarehousePage';
 import ProtectedRoute from '@/services/ProtectedRoute';
-import WarehousePage from '@/pages/warehouse/WarehousePage';
 import React from 'react'
 
 const page = () => {

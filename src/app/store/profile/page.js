@@ -1,4 +1,4 @@
-import ClientProfilePage from '@/pages/store/ClientProfilePage'
+import ClientProfilePage from '@/components/pages/store/ClientProfilePage'
 import React from 'react'
 
 const page = () => {

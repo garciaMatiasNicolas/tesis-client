@@ -1,4 +1,4 @@
-import CrmPage from '@/pages/crm/CrmPage';
+import CrmPage from '@/components/pages/crm/CrmPage';
 import ProtectedRoute from '@/services/ProtectedRoute';
 import React from 'react';
 
