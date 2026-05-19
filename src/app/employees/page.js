@@ -1,4 +1,4 @@
-import EmployeesPage from "@/pages/employees/EmployeesPage";
+import EmployeesPage from "@/components/pages/employees/EmployeesPage";
 import ProtectedRoute from "@/services/ProtectedRoute";
 
 const Page = () => {

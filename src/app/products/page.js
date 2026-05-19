@@ -1,6 +1,5 @@
-import ProductsPage from "@/pages/inventory/products/ProductsPage";
+import ProductsPage from "@/components/pages/inventory/products/ProductsPage";
 import ProtectedRoute from "@/services/ProtectedRoute";
-
 
 const page = () => {
   return (

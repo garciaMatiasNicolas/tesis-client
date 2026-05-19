@@ -1,4 +1,4 @@
-const { default: EcommercePage } = require("@/pages/store/EcommercePage")
+const { default: EcommercePage } = require("@/components/pages/store/EcommercePage")
 
 const Page = () => {
 

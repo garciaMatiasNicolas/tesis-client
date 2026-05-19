@@ -1,4 +1,4 @@
-import ProductCreatePage from "@/pages/inventory/products/ProductCreatePage";
+import ProductCreatePage from "@/components/pages/inventory/products/ProductCreatePage";
 import ProtectedRoute from "@/services/ProtectedRoute";
 
 const page = () => {

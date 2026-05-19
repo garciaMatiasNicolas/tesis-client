@@ -1,4 +1,4 @@
-import ProductUnitsPage from "@/pages/inventory/product-units/ProductUnitsPage";
+import ProductUnitsPage from "@/components/pages/inventory/product-units/ProductUnitsPage";
 import ProtectedRoute from "@/services/ProtectedRoute";
 
 const page = () => {

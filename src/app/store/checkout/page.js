@@ -1,6 +1,6 @@
 import StoreLayout from "../layout";
 
-const { default: CheckoutPage } = require("@/pages/store/CheckoutPage")
+const { default: CheckoutPage } = require("@/components/pages/store/CheckoutPage")
 
 const Page = () => {
 

@@ -1,4 +1,4 @@
-import ProfilePage from "@/pages/profile/ProfilePage";
+import ProfilePage from "@/components/pages/profile/ProfilePage";
 import ProtectedRoute from "@/services/ProtectedRoute";
 
 const Page = () => {

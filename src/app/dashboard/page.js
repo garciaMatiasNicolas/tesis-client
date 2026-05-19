@@ -1,5 +1,5 @@
+import StatsPage from "@/components/pages/stats/StatsPage";
 import ProtectedRoute from "@/services/ProtectedRoute";
-import StatsPage from "@/pages/stats/StatsPage";
 
 const Page = () => {
     return (
