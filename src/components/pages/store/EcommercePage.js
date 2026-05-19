@@ -1,14 +1,14 @@
 "use client";
 import React, { useState, useEffect, useCallback } from 'react';
-import ProductFilters from '../../components/store/ProductFilters';
-import ProductSort from '../../components/store/ProductSort';
-import ProductGrid from '../../components/store/ProductGrid';
-import ShoppingCart from '../../components/store/ShoppingCart';
 import useEcommerceService from '@/services/ecommerceService';
 import '../../themes/modeTransitions.css';
 import StoreHeader from '@/components/store/StoreHeader';
 import { useCart } from '@/hooks/useCart';
 import { useStoreWithTheme } from '@/hooks/useStore';
+import ProductFilters from '@/components/store/ProductFilters';
+import ProductSort from '@/components/store/ProductSort';
+import ProductGrid from '@/components/store/ProductGrid';
+import ShoppingCart from '@/components/store/ShoppingCart';
 
 const EcommercePage = () => {
     // Hooks personalizados - Usa el hook combinado para obtener store + theme
