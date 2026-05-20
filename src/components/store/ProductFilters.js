@@ -215,7 +215,8 @@ const ProductFilters = ({
                                         borderColor: theme.primary?.main
                                     }}
                                 >
-                                    {supp.name}
+                                    {supp.fantasy_name}
+                                    
                                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                     </svg>
@@ -387,143 +388,150 @@ const ProductFilters = ({
                 </div>
 
                 {/* Categorías */}
-                <div className="border-b" style={{
-                    borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
-                }}>
-                    <button
-                        onClick={() => toggleSection('categories')}
-                        className="w-full p-4 text-left flex items-center justify-between hover:opacity-80 transition-all cursor-pointer"
-                    >
-                        <span className="font-medium" style={{
-                            color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
-                        }}>Categorías</span>
-                        <svg 
-                            className={`w-5 h-5 transform transition-transform ${
-                                expandedSections.categories ? 'rotate-180' : ''
-                            }`}
-                            style={{
-                                color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
-                            }}
-                            fill="none" 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
+                {categories.length > 0 &&
+                    <div className="border-b" style={{
+                        borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
+                    }}>
+                        <button
+                            onClick={() => toggleSection('categories')}
+                            className="w-full p-4 text-left flex items-center justify-between hover:opacity-80 transition-all cursor-pointer"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.categories && (
-                        <div className="px-4 pb-4 space-y-2.5">
-                            {categories.map((category) => (
-                                <label key={category.id} className="flex items-center space-x-3 cursor-pointer hover:opacity-80 p-2 rounded transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={filters.categories.includes(category.id.toString())}
-                                        onChange={() => handleCheckboxChange('categories', category.id.toString())}
-                                        className="w-4 h-4 rounded focus:ring-2"
-                                        style={{
-                                            accentColor: theme.primary?.main
-                                        }}
-                                    />
-                                    <span className="text-sm" style={{
-                                        color: isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary
-                                    }}>{category.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                            <span className="font-medium" style={{
+                                color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                            }}>Categorías</span>
+                            <svg 
+                                className={`w-5 h-5 transform transition-transform ${
+                                    expandedSections.categories ? 'rotate-180' : ''
+                                }`}
+                                style={{
+                                    color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                                }}
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.categories && (
+                            <div className="px-4 pb-4 space-y-2.5">
+                                {categories.map((category) => (
+                                    <label key={category.id} className="flex items-center space-x-3 cursor-pointer hover:opacity-80 p-2 rounded transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={filters.categories.includes(category.id.toString())}
+                                            onChange={() => handleCheckboxChange('categories', category.id.toString())}
+                                            className="w-4 h-4 rounded focus:ring-2"
+                                            style={{
+                                                accentColor: theme.primary?.main
+                                            }}
+                                        />
+                                        <span className="text-sm" style={{
+                                            color: isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary
+                                        }}>{category.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                }
 
                 {/* Subcategorías */}
-                <div className="border-b" style={{
-                    borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
-                }}>
-                    <button
-                        onClick={() => toggleSection('subcategories')}
-                        className="w-full p-4 text-left flex items-center justify-between hover:opacity-80 transition-all cursor-pointer"
-                    >
-                        <span className="font-medium" style={{
-                            color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
-                        }}>Subcategorías</span>
-                        <svg 
-                            className={`w-5 h-5 transform transition-transform ${
-                                expandedSections.subcategories ? 'rotate-180' : ''
-                            }`}
-                            style={{
-                                color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
-                            }}
-                            fill="none" 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
+                {subcategories.length > 0 && 
+
+                    <div className="border-b" style={{
+                        borderColor: isDarkMode ? theme.border?.dark?.main : theme.border?.light?.main
+                    }}>
+                        <button
+                            onClick={() => toggleSection('subcategories')}
+                            className="w-full p-4 text-left flex items-center justify-between hover:opacity-80 transition-all cursor-pointer"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.subcategories && (
-                        <div className="px-4 pb-4 space-y-2.5">
-                            {subcategories.map((subcategory) => (
-                                <label key={subcategory.id} className="flex items-center space-x-3 cursor-pointer hover:opacity-80 p-2 rounded transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={filters.subcategories.includes(subcategory.id.toString())}
-                                        onChange={() => handleCheckboxChange('subcategories', subcategory.id.toString())}
-                                        className="w-4 h-4 rounded focus:ring-2"
-                                        style={{
-                                            accentColor: theme.primary?.main
-                                        }}
-                                    />
-                                    <span className="text-sm" style={{
-                                        color: isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary
-                                    }}>{subcategory.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                            <span className="font-medium" style={{
+                                color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                            }}>Subcategorías</span>
+                            <svg 
+                                className={`w-5 h-5 transform transition-transform ${
+                                    expandedSections.subcategories ? 'rotate-180' : ''
+                                }`}
+                                style={{
+                                    color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                                }}
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.subcategories && (
+                            <div className="px-4 pb-4 space-y-2.5">
+                                {subcategories.map((subcategory) => (
+                                    <label key={subcategory.id} className="flex items-center space-x-3 cursor-pointer hover:opacity-80 p-2 rounded transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={filters.subcategories.includes(subcategory.id.toString())}
+                                            onChange={() => handleCheckboxChange('subcategories', subcategory.id.toString())}
+                                            className="w-4 h-4 rounded focus:ring-2"
+                                            style={{
+                                                accentColor: theme.primary?.main
+                                            }}
+                                        />
+                                        <span className="text-sm" style={{
+                                            color: isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary
+                                        }}>{subcategory.name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                }
 
                 {/* Proveedores */}
-                <div>
-                    <button
-                        onClick={() => toggleSection('suppliers')}
-                        className="w-full p-4 text-left flex items-center justify-between hover:opacity-80 transition-all cursor-pointer"
-                    >
-                        <span className="font-medium" style={{
-                            color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
-                        }}>Proveedores</span>
-                        <svg 
-                            className={`w-5 h-5 transform transition-transform ${
-                                expandedSections.suppliers ? 'rotate-180' : ''
-                            }`}
-                            style={{
-                                color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
-                            }}
-                            fill="none" 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
+                {suppliers.length > 0 && 
+                    <div>
+                        <button
+                            onClick={() => toggleSection('suppliers')}
+                            className="w-full p-4 text-left flex items-center justify-between hover:opacity-80 transition-all cursor-pointer"
                         >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                    </button>
-                    {expandedSections.suppliers && (
-                        <div className="px-4 pb-4 space-y-2.5">
-                            {suppliers.map((supplier) => (
-                                <label key={supplier.id} className="flex items-center space-x-3 cursor-pointer hover:opacity-80 p-2 rounded transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={filters.suppliers.includes(supplier.id.toString())}
-                                        onChange={() => handleCheckboxChange('suppliers', supplier.id.toString())}
-                                        className="w-4 h-4 rounded focus:ring-2"
-                                        style={{
-                                            accentColor: theme.primary?.main
-                                        }}
-                                    />
-                                    <span className="text-sm" style={{
-                                        color: isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary
-                                    }}>{supplier.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                            <span className="font-medium" style={{
+                                color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary
+                            }}>Proveedores</span>
+                            <svg 
+                                className={`w-5 h-5 transform transition-transform ${
+                                    expandedSections.suppliers ? 'rotate-180' : ''
+                                }`}
+                                style={{
+                                    color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted
+                                }}
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        {expandedSections.suppliers && (
+                            <div className="px-4 pb-4 space-y-2.5">
+                                {suppliers.map((supplier) => (
+                                    <label key={supplier.id} className="flex items-center space-x-3 cursor-pointer hover:opacity-80 p-2 rounded transition-all">
+                                        <input
+                                            type="checkbox"
+                                            checked={filters.suppliers.includes(supplier.id.toString())}
+                                            onChange={() => handleCheckboxChange('suppliers', supplier.id.toString())}
+                                            className="w-4 h-4 rounded focus:ring-2"
+                                            style={{
+                                                accentColor: theme.primary?.main
+                                            }}
+                                        />
+                                        <span className="text-sm" style={{
+                                            color: isDarkMode ? theme.text?.dark?.secondary : theme.text?.light?.secondary
+                                        }}>{supplier.fantasy_name}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                }
             </div>
         </div>
     );
