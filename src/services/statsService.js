@@ -20,14 +20,34 @@ class StatsService {
      * Obtener métricas principales del dashboard
      * @returns {Promise} Métricas principales
      */
-    async getStatsOverview() {
+    async getStatsOverview(dateFrom = null, dateTo = null, groupFilter = {}, comparisonMode = 'previous_period') {
         if (!this.apiMethods) throw new Error('StatsService not initialized');
-        
+
         try {
-            const response = await this.apiMethods.getMethod('/billing/stats/overview/');
-            return response;
+            const params = { comparison_mode: comparisonMode };
+            if (dateFrom) params.date_from = dateFrom;
+            if (dateTo)   params.date_to   = dateTo;
+            if (groupFilter.categoryId)    params.category_id    = groupFilter.categoryId;
+            if (groupFilter.subcategoryId) params.subcategory_id = groupFilter.subcategoryId;
+            if (groupFilter.productId)     params.product_id     = groupFilter.productId;
+            if (groupFilter.supplierId)    params.supplier_id    = groupFilter.supplierId;
+            return await this.apiMethods.getMethod('/billing/stats/overview/', params);
         } catch (error) {
             console.error('Error fetching stats overview:', error);
+            throw error;
+        }
+    }
+
+    async getFilterOptions(categoryId = null, subcategoryId = null) {
+        if (!this.apiMethods) throw new Error('StatsService not initialized');
+
+        try {
+            const params = {};
+            if (categoryId)    params.category_id    = categoryId;
+            if (subcategoryId) params.subcategory_id = subcategoryId;
+            return await this.apiMethods.getMethod('/billing/stats/filter-options/', params);
+        } catch (error) {
+            console.error('Error fetching filter options:', error);
             throw error;
         }
     }
@@ -37,12 +57,14 @@ class StatsService {
      * @param {string} period - 'week', 'month', o 'year'
      * @returns {Promise} Datos del gráfico
      */
-    async getSalesChart(period = 'week') {
+    async getSalesChart(period = 'month', dateFrom = null, dateTo = null) {
         if (!this.apiMethods) throw new Error('StatsService not initialized');
         
         try {
-            const response = await this.apiMethods.getMethod('/billing/stats/sales-chart/', { period });
-            return response;
+            const params = { period };
+            if (dateFrom) params.date_from = dateFrom;
+            if (dateTo)   params.date_to   = dateTo;
+            return await this.apiMethods.getMethod('/billing/stats/sales-chart/', params);
         } catch (error) {
             console.error('Error fetching sales chart:', error);
             throw error;
@@ -54,12 +76,18 @@ class StatsService {
      * @param {number} limit - Cantidad de productos a retornar
      * @returns {Promise} Lista de productos más vendidos
      */
-    async getTopProducts(limit = 6) {
+    async getTopProducts(limit = 6, dateFrom = null, dateTo = null, groupFilter = {}) {
         if (!this.apiMethods) throw new Error('StatsService not initialized');
-        
+
         try {
-            const response = await this.apiMethods.getMethod('/billing/stats/top-products/', { limit });
-            return response;
+            const params = { limit };
+            if (dateFrom) params.date_from = dateFrom;
+            if (dateTo)   params.date_to   = dateTo;
+            if (groupFilter.categoryId)    params.category_id    = groupFilter.categoryId;
+            if (groupFilter.subcategoryId) params.subcategory_id = groupFilter.subcategoryId;
+            if (groupFilter.productId)     params.product_id     = groupFilter.productId;
+            if (groupFilter.supplierId)    params.supplier_id    = groupFilter.supplierId;
+            return await this.apiMethods.getMethod('/billing/stats/top-products/', params);
         } catch (error) {
             console.error('Error fetching top products:', error);
             throw error;
@@ -87,28 +115,36 @@ class StatsService {
      * Obtener distribución de ventas por canal
      * @returns {Promise} Distribución de ventas
      */
-    async getSalesByChannel() {
+    async getSalesByChannel(dateFrom = null, dateTo = null, groupFilter = {}) {
         if (!this.apiMethods) throw new Error('StatsService not initialized');
-        
+
         try {
-            const response = await this.apiMethods.getMethod('/billing/stats/sales-by-channel/');
-            return response;
+            const params = {};
+            if (dateFrom) params.date_from = dateFrom;
+            if (dateTo)   params.date_to   = dateTo;
+            if (groupFilter.categoryId)    params.category_id    = groupFilter.categoryId;
+            if (groupFilter.subcategoryId) params.subcategory_id = groupFilter.subcategoryId;
+            if (groupFilter.productId)     params.product_id     = groupFilter.productId;
+            if (groupFilter.supplierId)    params.supplier_id    = groupFilter.supplierId;
+            return await this.apiMethods.getMethod('/billing/stats/sales-by-channel/', params);
         } catch (error) {
             console.error('Error fetching sales by channel:', error);
             throw error;
         }
     }
 
-    /**
-     * Obtener resumen de órdenes por estado
-     * @returns {Promise} Resumen de órdenes
-     */
-    async getOrderStatusSummary() {
+    async getOrderStatusSummary(dateFrom = null, dateTo = null, groupFilter = {}) {
         if (!this.apiMethods) throw new Error('StatsService not initialized');
-        
+
         try {
-            const response = await this.apiMethods.getMethod('/billing/stats/order-status/');
-            return response;
+            const params = {};
+            if (dateFrom) params.date_from = dateFrom;
+            if (dateTo)   params.date_to   = dateTo;
+            if (groupFilter.categoryId)    params.category_id    = groupFilter.categoryId;
+            if (groupFilter.subcategoryId) params.subcategory_id = groupFilter.subcategoryId;
+            if (groupFilter.productId)     params.product_id     = groupFilter.productId;
+            if (groupFilter.supplierId)    params.supplier_id    = groupFilter.supplierId;
+            return await this.apiMethods.getMethod('/billing/stats/order-status/', params);
         } catch (error) {
             console.error('Error fetching order status summary:', error);
             throw error;

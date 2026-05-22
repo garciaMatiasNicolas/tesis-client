@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import useApiMethods from '@/hooks/useApiMethods';
 import statsService from '@/services/statsService';
 
-const TopProductsTable = () => {
+const TopProductsTable = ({ dateFrom = null, dateTo = null, groupFilter = {} }) => {
     const [topProducts, setTopProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -12,16 +12,22 @@ const TopProductsTable = () => {
     useEffect(() => {
         if (apiMethods) {
             statsService.initialize(apiMethods);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (statsService.apiMethods) {
             loadTopProducts();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Solo ejecutar una vez al montar
+    }, [dateFrom, dateTo, groupFilter.categoryId, groupFilter.subcategoryId, groupFilter.productId, groupFilter.supplierId]);
 
     const loadTopProducts = async () => {
         try {
             setLoading(true);
             setError(null);
-            const products = await statsService.getTopProducts(6);
+            const products = await statsService.getTopProducts(6, dateFrom, dateTo, groupFilter);
             setTopProducts(products);
         } catch (err) {
             console.error('Error loading top products:', err);
