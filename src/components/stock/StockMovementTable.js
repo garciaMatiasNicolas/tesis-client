@@ -180,6 +180,14 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
                 </span>
             );
         }
+        if (type === 'ADJ') {
+            return (
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800">
+                    <FaSync className="w-3 h-3" />
+                    Ajuste
+                </span>
+            );
+        }
         return (
             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">
                 <FaArrowUp className="w-3 h-3" />
@@ -675,6 +683,7 @@ const StockMovementTable = ({ searchTerm = "", onSearchChange }) => {
                                 }}
                             >
                                 <option value="Todos">Todos los tipos</option>
+                                <option value="ADJ">Ajustes</option>
                                 <option value="IN">Ingresos</option>
                                 <option value="OUT">Egresos</option>
                             </select>
