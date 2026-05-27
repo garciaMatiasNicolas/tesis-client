@@ -17,7 +17,8 @@ import {
     FaExclamationTriangle,
     FaWarehouse,
     FaCheck,
-    FaStore
+    FaStore,
+    FaInfoCircle
 } from "react-icons/fa";
 import crmService from '@/services/crmService';
 import useProductService from '@/services/productService';
@@ -104,6 +105,8 @@ export default function SalesFormModal({
         type: '',
         id: null
     });
+    const [showStockInconsistency, setShowStockInconsistency] = useState(false);
+    const [stockInconsistencyData, setStockInconsistencyData] = useState(null);
 
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
@@ -179,9 +182,43 @@ export default function SalesFormModal({
 
         // Cerrar modal sin reenviar automáticamente
         setShowStockModal(false);
-        
+
         // NO resetear selectedOrigin para poder mostrarlo en el formulario
         // El usuario verá el origen seleccionado y hará clic manualmente en "Crear Orden"
+    };
+
+    const handleStockInconsistencyOption = (option) => {
+        if (option === 'cancel') {
+            setShowStockInconsistency(false);
+            setStockInconsistencyData(null);
+        } else if (option === 'change_origin') {
+            // Cerrar inconsistencia y abrir el modal de selección de origen con todas las alternativas
+            setShowStockInconsistency(false);
+            const detail = stockInconsistencyData?.details[0];
+            if (detail) {
+                setStockError({
+                    productName: detail.product_name,
+                    required: detail.required_qty,
+                    available: detail.current_origin.available,
+                    currentLocation: detail.current_origin.name,
+                    branches: [],
+                    warehouses: []
+                });
+                setAvailableBranches(
+                    detail.alternative_locations
+                        .filter(l => l.type === 'branch')
+                        .map(l => ({ name: l.name, id: l.id, quantity: l.available }))
+                );
+                setAvailableWarehouses(
+                    detail.alternative_locations
+                        .filter(l => l.type === 'warehouse')
+                        .map(l => ({ name: l.name, id: l.id, quantity: l.available }))
+                );
+                setShowStockModal(true);
+            }
+        } else if (option === 'create_movements') {
+            window.location.href = '/movements';
+        }
     };
 
     // Modal de selección de origen
@@ -358,6 +395,108 @@ export default function SalesFormModal({
     };
     
 
+    // Modal de inconsistencia de stock (ninguna ubicación tiene el total requerido)
+    const StockInconsistencyModal = () => {
+        if (!showStockInconsistency || !stockInconsistencyData) return null;
+
+        return (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-[60]">
+                <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-red-50">
+                        <div>
+                            <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                                <FaExclamationTriangle className="text-red-500" />
+                                Stock Insuficiente en Todas las Ubicaciones
+                            </h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                                Ninguna ubicación tiene la cantidad total requerida
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => handleStockInconsistencyOption('cancel')}
+                            className="text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                            <FaTimes size={20} />
+                        </button>
+                    </div>
+
+                    {/* Body */}
+                    <div className="p-6 space-y-4 overflow-y-auto max-h-[calc(85vh-220px)]">
+                        {stockInconsistencyData.details.map((item, idx) => (
+                            <div key={idx} className="border-l-4 border-red-400 pl-4 py-2 bg-red-50 rounded-r-lg">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h5 className="font-semibold text-gray-900">{item.product_name}</h5>
+                                    </div>
+                                    <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-medium whitespace-nowrap">
+                                        Requiere: {item.required_qty} unidades
+                                    </span>
+                                </div>
+
+                                {/* Origen actual */}
+                                <div className="bg-white p-3 rounded border border-red-200 mb-2">
+                                    <p className="text-xs text-gray-500 mb-1">Origen seleccionado:</p>
+                                    <div className="flex justify-between items-center">
+                                        <p className="text-sm font-medium text-gray-900">{item.current_origin.name}</p>
+                                        <span className="text-red-600 text-sm font-semibold">
+                                            {item.current_origin.available} disponibles ❌
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Alternativas con stock parcial */}
+                                {item.alternative_locations.length > 0 && (
+                                    <div className="bg-orange-50 p-3 rounded border border-orange-200">
+                                        <p className="text-xs text-orange-700 font-medium mb-2">Stock parcial en otras ubicaciones:</p>
+                                        {item.alternative_locations.map((loc, locIdx) => (
+                                            <div key={locIdx} className="flex justify-between items-center text-sm py-1">
+                                                <span className="text-gray-700">
+                                                    {loc.type === 'branch' ? '🏪' : '🏭'} {loc.name}
+                                                </span>
+                                                <span className="text-orange-700 font-semibold">
+                                                    {loc.available} unidades ⚠️
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+
+                        {/* Opciones de resolución */}
+                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                            <h5 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                                <FaInfoCircle /> ¿Cómo resolverlo?
+                            </h5>
+                            <ul className="text-sm text-blue-800 space-y-1">
+                                <li>• <strong>Crear Movimientos:</strong> consolidá el stock de varias ubicaciones en una sola antes de crear la orden</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                        <button
+                            type="button"
+                            onClick={() => handleStockInconsistencyOption('cancel')}
+                            className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => handleStockInconsistencyOption('create_movements')}
+                            className="px-4 py-2 bg-[#18c29c] text-white rounded-lg hover:bg-[#15a884] transition-colors"
+                        >
+                            Ir a Movimientos de Stock
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     // Cargar clientes y productos desde la API
     useEffect(() => {
         const loadData = async () => {
@@ -375,11 +514,26 @@ export default function SalesFormModal({
                 
                 // Cargar productos usando el servicio
                 const productsResponse = await productService.getAllProducts({all: true});
-                setProducts(productsResponse.results || productsResponse || []);
+                const loadedProducts = productsResponse.results || productsResponse || [];
+                setProducts(loadedProducts);
                 // Cargar provincias de Argentina
                 if (!salesOrder) {
                     const provinciasData = await georefService.getProvincias();
                     setProvincias(provinciasData);
+                }
+
+                // Inicializar búsquedas de productos para modo edición usando los productos recién cargados
+                if (salesOrder) {
+                    const newSearches = {};
+                    (salesOrder.sales_items || []).forEach((item, index) => {
+                        const product = loadedProducts.find(p => p.id === parseInt(item.product));
+                        newSearches[index] = {
+                            search: product ? `${product.description} (SKU: ${product.sku})` : '',
+                            filtered: [],
+                            showDropdown: false
+                        };
+                    });
+                    setProductSearches(newSearches);
                 }
                 
                 setDataLoaded(true);
@@ -422,6 +576,8 @@ export default function SalesFormModal({
         
         if (isOpen) {
             if (salesOrder) {
+                console.log('Editando orden de venta:', salesOrder);
+                setLoadingData(true);
                 // Edit mode - populate form with existing data
                 setCustomerType('registered');
                 if (salesOrder.customer) {
@@ -480,17 +636,13 @@ export default function SalesFormModal({
                     sales_items: salesItems
                 });
                 
-                // Inicializar estados de búsqueda para items existentes
+                // Inicializar estados de búsqueda para items existentes (con strings vacíos hasta que loadData cargue los productos)
                 const newSearches = {};
                 salesItems.forEach((item, index) => {
-                    const product = products.find(p => p.id === parseInt(item.product_id));
-                    newSearches[index] = {
-                        search: product ? `${product.description} (SKU: ${product.sku})` : '',
-                        filtered: [],
-                        showDropdown: false
-                    };
+                    newSearches[index] = { search: '', filtered: [], showDropdown: false };
                 });
                 setProductSearches(newSearches);
+                setLoadingData(false);
             } else {
                 // Create mode - reset to default values
                 const tomorrow = new Date();
@@ -1015,13 +1167,46 @@ export default function SalesFormModal({
                 const errorMessage = Array.isArray(stockErrors) ? stockErrors[0] : stockErrors;
                 
                 // Verificar si contiene información sobre otras ubicaciones disponibles
-                if (typeof errorMessage === 'string' && 
-                    (errorMessage.includes('Stock disponible en otras ubicaciones') || 
+                if (typeof errorMessage === 'string' &&
+                    (errorMessage.includes('Stock disponible en otras ubicaciones') ||
                      errorMessage.includes('Stock en otras ubicaciones'))) {
-                    
-                    // Parsear el error
+
                     const parsedError = parseStockError(errorMessage);
-                    
+                    const allAlternatives = [
+                        ...parsedError.branches.map(b => ({ type: 'branch', ...b })),
+                        ...parsedError.warehouses.map(w => ({ type: 'warehouse', ...w }))
+                    ];
+                    const required = parsedError.required;
+                    console.debug('[StockCheck] required:', required, '| alternatives:', allAlternatives);
+                    // Guard: si required es 0 (parsing fallido), ninguna alternativa es "adecuada"
+                    const hasAdequateAlternative = required > 0 &&
+                        allAlternatives.some(loc => loc.quantity >= required);
+
+                    if (!hasAdequateAlternative && allAlternatives.length > 0) {
+                        // Ninguna ubicación tiene stock suficiente — mostrar modal de inconsistencia
+                        setShowStockModal(false); // limpiar estado residual
+                        setStockInconsistencyData({
+                            details: [{
+                                product_name: parsedError.productName,
+                                required_qty: required,
+                                current_origin: {
+                                    name: parsedError.currentLocation,
+                                    available: parsedError.available
+                                },
+                                alternative_locations: allAlternatives.map(loc => ({
+                                    type: loc.type,
+                                    name: loc.name,
+                                    id: loc.id,
+                                    available: loc.quantity
+                                }))
+                            }]
+                        });
+                        setShowStockInconsistency(true);
+                        return;
+                    }
+
+                    // Al menos una ubicación tiene stock suficiente — flujo normal
+                    setShowStockInconsistency(false); // limpiar estado residual
                     setStockError(parsedError);
                     setAvailableBranches(parsedError.branches);
                     setAvailableWarehouses(parsedError.warehouses);
@@ -1956,6 +2141,9 @@ export default function SalesFormModal({
             
             {/* Modal de selección de origen */}
             <StockOriginModal />
+
+            {/* Modal de inconsistencia de stock */}
+            <StockInconsistencyModal />
         </>
     );
 }

@@ -670,45 +670,78 @@ export default function PurchaseDetailModal({
                     {purchase.comments && purchase.comments.length > 0 && (
                         <div>
                             <h4 className="text-sm font-semibold text-gray-700 mb-3 pb-2 border-b border-gray-200">
-                                Historial de Comentarios
+                                Historial de Cambios
                             </h4>
                             <div className="space-y-2">
-                                {purchase.comments.map((comment, index) => (
-                                    <div key={index} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                        <p className="text-sm text-gray-700">
-                                            {comment?.comment || 'Comentario'}
-                                        </p>
-                                        {Array.isArray(comment?.fields_updated) && comment.fields_updated.length > 0 && (
-                                            <div className="mt-2">
-                                                <p className="text-xs font-semibold text-gray-600">Campos actualizados:</p>
-                                                <ul className="text-xs text-gray-600 list-disc pl-4">
-                                                    {comment.fields_updated.map((field, idx) => (
-                                                        <li key={idx}>{field}</li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-                                        {comment?.updated_from && Object.keys(comment.updated_from).length > 0 && (
-                                            <div className="mt-2">
-                                                <p className="text-xs font-semibold text-gray-600">Cambios:</p>
-                                                <ul className="text-xs text-gray-600 list-disc pl-4">
-                                                    {Object.entries(comment.updated_from).map(([field, change], idx) => (
-                                                        <li key={idx}>
-                                                            {field}: {Object.keys(change || {})[0]} → {Object.values(change || {})[0]}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-                                        {(comment?.created_at || comment?.updated_at) && (
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                {comment?.updated_at
-                                                    ? `Actualizado: ${formatDate(comment.updated_at)}`
-                                                    : `Creado: ${formatDate(comment.created_at)}`}
+                                {purchase.comments.map((comment, index) => {
+                                    const fieldLabels = {
+                                        status: 'Estado',
+                                        was_payed: 'Estado de pago',
+                                        received: 'Recepción',
+                                        received_date: 'Fecha de recepción',
+                                        payment_method: 'Método de pago',
+                                        delivery_date: 'Fecha de entrega',
+                                        total_price: 'Precio total',
+                                        discount: 'Descuento',
+                                        taxes: 'Impuestos',
+                                        shipping_cost: 'Costo de envío',
+                                        transport: 'Transporte',
+                                        driver: 'Conductor',
+                                        patent: 'Patente',
+                                        currency: 'Moneda',
+                                        description: 'Descripción',
+                                    };
+                                    const valueLabels = {
+                                        draft: 'Presupuesto',
+                                        pending: 'Pendiente',
+                                        completed: 'Completada',
+                                        cancelled: 'Cancelada',
+                                        True: 'Sí',
+                                        False: 'No',
+                                        true: 'Sí',
+                                        false: 'No',
+                                        None: 'Sin definir',
+                                        null: 'Sin definir',
+                                    };
+                                    const translateValue = (val) => {
+                                        const str = String(val);
+                                        if (valueLabels[str]) return valueLabels[str];
+                                        // Formatear fechas YYYY-MM-DD
+                                        if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return formatDate(str);
+                                        return str;
+                                    };
+                                    const hasChanges = comment?.updated_from && Object.keys(comment.updated_from).length > 0;
+
+                                    return (
+                                        <div key={index} className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                            <p className="text-sm font-medium text-gray-800">
+                                                {comment?.comment || 'Actualización'}
                                             </p>
-                                        )}
-                                    </div>
-                                ))}
+                                            {hasChanges && (
+                                                <div className="mt-2 space-y-1">
+                                                    {Object.entries(comment.updated_from).map(([field, change], idx) => {
+                                                        const oldVal = translateValue(Object.keys(change || {})[0]);
+                                                        const newVal = translateValue(Object.values(change || {})[0]);
+                                                        const label = fieldLabels[field] || field;
+                                                        return (
+                                                            <div key={idx} className="flex items-center gap-2 text-xs text-gray-600">
+                                                                <span className="font-medium text-gray-700">{label}:</span>
+                                                                <span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded">{oldVal}</span>
+                                                                <span className="text-gray-400">→</span>
+                                                                <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded">{newVal}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                            {(comment?.created_at || comment?.updated_at) && (
+                                                <p className="text-xs text-gray-400 mt-2">
+                                                    {formatDate(comment.updated_at || comment.created_at)}
+                                                </p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}

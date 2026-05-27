@@ -38,14 +38,14 @@ const CreateInternalMovementModal = ({ isOpen, onClose, onSuccess }) => {
             setLoadingData(true);
             try {
                 const [productsData, warehousesData, branchesData] = await Promise.all([
-                    productService.getAllProducts(),
+                    productService.getAllProducts({ all: true }),
                     warehouseService.getAllWarehouses(),
                     branchService.getAllBranches()
                 ]);
 
-                setProducts(productsData || []);
-                setWarehouses(warehousesData || []);
-                setBranches(branchesData || []);
+                setProducts(Array.isArray(productsData) ? productsData : (productsData?.results || []));
+                setWarehouses(Array.isArray(warehousesData) ? warehousesData : (warehousesData?.results || []));
+                setBranches(Array.isArray(branchesData) ? branchesData : (branchesData?.results || []));
             } catch (err) {
                 console.error('Error al cargar datos:', err);
                 setError('No se pudieron cargar los datos necesarios');

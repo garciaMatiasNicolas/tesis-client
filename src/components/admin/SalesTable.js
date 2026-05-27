@@ -459,6 +459,7 @@ export default function SalesTable({
                                                         onClick={() => onEditSale(sale)}
                                                         className="text-blue-600 hover:text-blue-900"
                                                         title="Editar orden"
+                                                        disabled={sale.status !== 'draft'} // Disable edit for completed or cancelled orders
                                                     >
                                                         <FaEdit />
                                                     </button>

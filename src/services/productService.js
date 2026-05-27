@@ -22,7 +22,6 @@ const useProductService = () => {
                 const url = queryString ? `/products/?${queryString}` : '/products/';
                 
                 const response = await getMethod(url);
-                console.log('Productos obtenidos:', response);
                 return response;
             } catch (error) {
                 console.error('Error al obtener productos:', error);
