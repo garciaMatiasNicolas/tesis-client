@@ -781,7 +781,7 @@ const ClientProfilePage = () => {
                                 </div>
                             ) : (
                                 <div className="space-y-4">
-                                    {orders.filter(order => order.status !== 'completed').map((order) => {
+                                    {orders.map((order) => {
                                         const currentStepIndex = getCurrentStepIndex(order.status);
                                         const isExpanded = expandedOrder === order.id;
                                         

@@ -145,7 +145,11 @@ export default function AuthForm({
                     </div>
                 </>
             )}
-
+            <span className="text-center text-[#495057] underline mb-4 block">
+                <a href="/forgot-password" className="text-teal-500 hover:text-teal-600">
+                    ¿Olvidaste tu contraseña?
+                </a>
+            </span>
             <button
                 type="submit"
                 style={{ cursor: "pointer" }}

@@ -74,7 +74,8 @@ const useUserService = () => {
         // Verificar si un email existe
         checkEmailExists: async (email) => {
             try {
-                const response = await getMethod(`/users/email-exists/?email=${email}`);
+                const response = await getMethod(`/check-email/?email=${email}`, {}, false);
+                console.log('Respuesta de verificación de email:', response);
                 return response;
             } catch (error) {
                 console.error('Error al verificar email:', error);

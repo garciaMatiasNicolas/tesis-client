@@ -210,25 +210,10 @@ export default function SupplierModal({
         if (!newSupplier.name.trim()) {
             validationErrors.name = ['El nombre es obligatorio'];
         }
-        if (!newSupplier.email.trim()) {
-            validationErrors.email = ['El correo electrónico es obligatorio'];
-        }
-        if (!newSupplier.phone.trim()) {
-            validationErrors.phone = ['El teléfono es obligatorio'];
-        }
-        if (!newSupplier.address.trim()) {
-            validationErrors.address = ['La dirección es obligatoria'];
-        }
         if (!newSupplier.country.trim()) {
             validationErrors.country = ['El país es obligatorio'];
         }
-        if (!newSupplier.state.trim()) {
-            validationErrors.state = ['La provincia/estado es obligatoria'];
-        }
-        if (!newSupplier.city.trim()) {
-            validationErrors.city = ['La ciudad es obligatoria'];
-        }
-        
+
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
             return;
@@ -401,7 +386,7 @@ export default function SupplierModal({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Correo Electrónico <span className="text-red-500">*</span>
+                                    Correo Electrónico
                                 </label>
                                 <input
                                     className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
@@ -420,7 +405,7 @@ export default function SupplierModal({
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Teléfono <span className="text-red-500">*</span>
+                                    Teléfono
                                 </label>
                                 <input
                                     className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${
@@ -537,7 +522,7 @@ export default function SupplierModal({
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Provincia/Estado <span className="text-red-500">*</span>
+                                    Provincia/Estado 
                                     {newSupplier.country === 'Argentina' && loadingProvincias && (
                                         <FaSpinner className="inline ml-2 animate-spin text-gray-400 text-xs" />
                                     )}
@@ -576,7 +561,7 @@ export default function SupplierModal({
                             </div>
                             <div className="relative">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Ciudad/Localidad <span className="text-red-500">*</span>
+                                    Ciudad/Localidad 
                                     {newSupplier.country === 'Argentina' && loadingCiudades && (
                                         <FaSpinner className="inline ml-2 animate-spin text-gray-400 text-xs" />
                                     )}
@@ -656,7 +641,7 @@ export default function SupplierModal({
                             </div>
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Dirección <span className="text-red-500">*</span>
+                                    Dirección
                                 </label>
                                 <input
                                     className={`w-full border rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all ${

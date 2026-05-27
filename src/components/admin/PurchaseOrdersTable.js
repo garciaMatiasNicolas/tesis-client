@@ -413,6 +413,7 @@ export default function PurchaseOrdersTable({
                                                         onClick={() => onEditPurchase(order)}
                                                         className="text-[#18c29c] hover:text-[#15a884] mr-3 inline-flex items-center transition-colors duration-150"
                                                         title="Editar"
+                                                        disabled={order.status !== 'draft'} // Solo permitir editar si es un presupuesto
                                                     >
                                                         <FaEdit className="h-4 w-4" />
                                                     </button>
