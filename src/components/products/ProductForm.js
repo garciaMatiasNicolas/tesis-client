@@ -16,10 +16,6 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
     description: '',
     price: '',
     cost_price: '',
-    weight: '',
-    height: '',
-    width: '',
-    depth: '',
     safety_stock: '',
     unit_type: 'count',
     base_unit_name: 'unit',
@@ -94,10 +90,6 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
       'description': 'Descripción del producto',
       'price': 'Precio',
       'cost_price': 'Precio de costo',
-      'weight': 'Peso',
-      'height': 'Altura',
-      'width': 'Ancho', 
-      'depth': 'Profundidad',
       'storage_unit': 'Unidad de almacenamiento',
       'video_url': 'URL del video',
       'category': 'Categoría',
@@ -199,10 +191,6 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
             description: product.description || '',
             price: product.price || '',
             cost_price: product.cost_price || '',
-            weight: product.weight || '',
-            height: product.height || '',
-            width: product.width || '',
-            depth: product.depth || '',
             safety_stock: product.safety_stock ?? '',
             unit_type: product.unit_type || 'count',
             base_unit_name: product.base_unit_name || 'unit',
@@ -525,10 +513,6 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
         cost_price: parseFloat(formData.cost_price) || 0,
         promotional_price: parseFloat(formData.promotional_price) || null,
         safety_stock: parseFloat(formData.safety_stock) || 0,
-        weight: parseFloat(formData.weight) || null,
-        height: parseFloat(formData.height) || null,
-        width: parseFloat(formData.width) || null,
-        depth: parseFloat(formData.depth) || null,
       };
       
       let result;
@@ -617,10 +601,6 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
             description: '',
             price: '',
             cost_price: '',
-            weight: '',
-            height: '',
-            width: '',
-            depth: '',
             safety_stock: '',
             unit_type: 'count',
             base_unit_name: 'unit',
@@ -1071,90 +1051,6 @@ export default function ProductForm({ product = null, isEditing = false, onProdu
               )}
             </div>
           </div>
-
-          {/* Product Type */}
-          <div className="mb-6">
-            <label className="block font-semibold mb-2 text-gray-800">Tipo de producto</label>
-            <div className="flex gap-6 flex-wrap">
-              <label className="flex items-center text-gray-800">
-                <input
-                  type="radio"
-                  name="product_type"
-                  value="physical"
-                  checked={formData.product_type === "physical"}
-                  onChange={(e) => handleInputChange('product_type', e.target.value)}
-                  className="accent-[#18c29c] mr-2"
-                />
-                Físico
-              </label>
-              <label className="flex items-center text-gray-800">
-                <input
-                  type="radio"
-                  name="product_type"
-                  value="digital"
-                  checked={formData.product_type === "digital"}
-                  onChange={(e) => handleInputChange('product_type', e.target.value)}
-                  className="accent-[#18c29c] mr-2"
-                />
-                Digital o Servicio
-              </label>
-            </div>
-          </div>
-
-          {/* Weight and dimensions - Only for physical products */}
-          {formData.product_type === "physical" && (
-            <div className="mb-6 flex flex-wrap gap-6">
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm mb-1 text-gray-800 flex items-center gap-1">
-                  <FaWeight className="text-[#18c29c]" /> Peso (kg)
-                </label>
-                <input
-                  type="number"
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900"
-                  min="0"
-                  step="0.01"
-                  value={formData.weight}
-                  onChange={(e) => handleInputChange('weight', e.target.value)}
-                />
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm mb-1 text-gray-800 flex items-center gap-1">
-                  <FaRulerVertical className="text-[#18c29c]" /> Altura (cm)
-                </label>
-                <input 
-                  type="number" 
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900" 
-                  min="0"
-                  value={formData.height}
-                  onChange={(e) => handleInputChange('height', e.target.value)}
-                />
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm mb-1 text-gray-800 flex items-center gap-1">
-                  <FaRulerHorizontal className="text-[#18c29c]" /> Ancho (cm)
-                </label>
-                <input 
-                  type="number" 
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900" 
-                  min="0"
-                  value={formData.width}
-                  onChange={(e) => handleInputChange('width', e.target.value)}
-                />
-              </div>
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-sm mb-1 text-gray-800 flex items-center gap-1">
-                  <FaCube className="text-[#18c29c]" /> Profundidad (cm)
-                </label>
-                <input 
-                  type="number" 
-                  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-[#18c29c] text-gray-900" 
-                  min="0"
-                  value={formData.depth}
-                  onChange={(e) => handleInputChange('depth', e.target.value)}
-                />
-              </div>
-            </div>
-          )}
 
           {/* Unit Type and Base Unit */}
           <div className="mb-6 flex flex-wrap gap-6">
