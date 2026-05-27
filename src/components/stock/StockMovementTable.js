@@ -17,7 +17,8 @@ import {
     FaChevronLeft,
     FaChevronRight,
     FaEye,
-    FaPlus
+    FaPlus,
+    FaSync
 } from 'react-icons/fa';
 import useStockService from '@/services/stockService';
 import useApiMethods from '@/hooks/useApiMethods';
