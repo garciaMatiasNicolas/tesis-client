@@ -1,5 +1,5 @@
 "use client";
-import CategoriesTable from '@/components/categories/CategoriesTable';
+import CategoriesTable from '@/components/modules/categories/CategoriesTable';
 import SideBar from '@/components/ui/SideBar';
 import Alert from '@/components/ui/Alert';
 import useApiMethods from '@/hooks/useApiMethods';

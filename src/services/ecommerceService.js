@@ -2,7 +2,7 @@ import useApiMethods from '@/hooks/useApiMethods';
 import { setAuthTokenIntoCookie } from '@/services/auth';
 
 const useEcommerceService = () => {
-    const { getMethod, postMethod, putMethod, patchMethod } = useApiMethods();
+    const { getMethod, postMethod, putMethod, patchMethod, deleteMethod } = useApiMethods();
 
     const ecommerceService = {
         // Obtener productos con filtros y paginación
@@ -187,12 +187,12 @@ const useEcommerceService = () => {
         },
 
         // Función completa para checkout - crear customer, carrito y transferir items
-        completeCheckout: async (formData, cartItems) => {
+        completeCheckout: async (formData, cartItems, paymentMethodId = null) => {
             try {
-                
+
                 const customer = await getMethod('/ecommerce/customers/me/', {}, true);
                 const cart = await postMethod('/ecommerce/carts/', { customer_id: customer.id }, {}, true);
-                
+
                 // 3. Agregar todos los items del localStorage al carrito del backend
                 for (const item of cartItems) {
                     await postMethod(`/ecommerce/carts/${cart.id}/items/`, {
@@ -200,11 +200,11 @@ const useEcommerceService = () => {
                         quantity: item.quantity
                     }, {}, true);
                 }
-                
+
                 // 4. Hacer checkout del carrito (convertir a orden de venta)
                 const checkoutData = {
-                    payment_method: 'pendiente',
-                    delivery_date: new Date().toISOString().split('T')[0], // Fecha actual
+                    payment_method_id: paymentMethodId || null,
+                    delivery_date: new Date().toISOString().split('T')[0],
                     deliver_to: formData.address || `${formData.city}, ${formData.state}`,
                     shipping_cost: 0,
                     taxes: 0,
@@ -327,7 +327,85 @@ const useEcommerceService = () => {
                 console.error('Error al obtener pedidos del cliente:', error);
                 throw error;
             }
-        }
+        },
+
+        // Métodos de pago activos de la tienda (público, sin credenciales)
+        getStorePaymentMethods: async () => {
+            try {
+                const response = await getMethod('/ecommerce/store/payment-methods/', {}, false);
+                return Array.isArray(response) ? response : response?.results || [];
+            } catch (error) {
+                console.error('Error al obtener métodos de pago:', error);
+                throw error;
+            }
+        },
+
+        // Crear preferencia de Checkout Pro en Mercado Pago (flujo redirect)
+        createMercadoPagoPreference: async (orderId, baseUrl = '') => {
+            try {
+                const response = await postMethod('/ecommerce/payment/mp/create-preference/', {
+                    order_id: orderId,
+                    base_url: baseUrl,
+                }, true);
+                return response;
+            } catch (error) {
+                console.error('Error al crear preferencia de MP:', error);
+                throw error;
+            }
+        },
+
+        // Consultar el estado de una transacción de MP por payment_id
+        getMpPaymentStatus: async (paymentId) => {
+            try {
+                const response = await getMethod(`/ecommerce/payment/mp/status/${paymentId}/`, {}, true);
+                return response;
+            } catch (error) {
+                console.error('Error al consultar estado del pago:', error);
+                throw error;
+            }
+        },
+
+        // Eliminar una orden draft que falló en el pago (no deja rastro en el sistema)
+        cancelEcommerceOrder: async (orderId) => {
+            try {
+                await deleteMethod(`/ecommerce/orders/${orderId}/cancel/`, true);
+            } catch (error) {
+                console.error('Error al cancelar orden de pago fallido:', error);
+            }
+        },
+
+        // Validar si hay stock disponible para un producto y cantidad dada
+        validateStockProduct: async (productId, quantity) => {
+            try {
+                const response = await getMethod(
+                    `/validate-stock-product/?product_id=${productId}&quantity=${quantity}`,
+                    {},
+                    false
+                );
+                return response;
+            } catch (error) {
+                console.error('Error al validar stock del producto:', error);
+                throw error;
+            }
+        },
+
+        // Procesar pago con tarjeta via Bricks (token generado por el SDK de MP)
+        processMercadoPagoCard: async (orderId, brickFormData) => {
+            try {
+                const response = await postMethod('/ecommerce/payment/mp/process-card/', {
+                    order_id: orderId,
+                    token: brickFormData.token,
+                    payment_method_id: brickFormData.payment_method_id,
+                    installments: brickFormData.installments,
+                    issuer_id: brickFormData.issuer_id,
+                    payer_email: brickFormData.payer?.email || '',
+                }, true);
+                return response;
+            } catch (error) {
+                console.error('Error al procesar pago con tarjeta:', error);
+                throw error;
+            }
+        },
     };
 
   return ecommerceService;

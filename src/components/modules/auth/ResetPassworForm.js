@@ -3,7 +3,7 @@ import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import useApiMethods from "@/hooks/useApiMethods";
 import useUserService from "@/services/userService";
-import Alert from "../ui/Alert";
+import Alert from "../../ui/Alert";
 
 const RECOVERY_OPTIONS = [
     {
@@ -248,7 +248,7 @@ export default function ResetPasswordForm() {
                     <button
                         type="submit"
                         disabled={!form.email || loading}
-                        className="w-full bg-[#18c29c] hover:bg-[#13a884] text-white py-2 rounded-md font-semibold text-lg transition disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2"
+                        className="w-full bg-[#18c29c] hover:bg-[#18c29c] text-white py-2 rounded-md font-semibold text-lg transition disabled:opacity-60 cursor-pointer flex items-center justify-center gap-2"
                     >
                         {loading ? <Spinner /> : "Continuar"}
                     </button>
@@ -402,7 +402,7 @@ export default function ResetPasswordForm() {
                                 <button
                                     type="submit"
                                     disabled={loading || isConfirmDisabled()}
-                                    className="flex-1 bg-[#18c29c] hover:bg-[#13a884] text-white py-2 rounded-md font-semibold text-lg transition disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+                                    className="flex-1 bg-[#18c29c] hover:bg-[#18c29c] text-white py-2 rounded-md font-semibold text-lg transition disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
                                 >
                                     {loading ? <Spinner /> : (
                                         recoveryType === "2fa_only" ? "Revincular autenticador" : "Restablecer contraseña"
@@ -432,7 +432,7 @@ export default function ResetPasswordForm() {
                     <button
                         type="button"
                         onClick={() => router.push("/login")}
-                        className="mt-8 w-full bg-[#18c29c] hover:bg-[#13a884] text-white py-2 rounded-md font-semibold text-lg transition cursor-pointer"
+                        className="mt-8 w-full bg-[#18c29c] hover:bg-[#18c29c] text-white py-2 rounded-md font-semibold text-lg transition cursor-pointer"
                     >
                         Ir al login
                     </button>

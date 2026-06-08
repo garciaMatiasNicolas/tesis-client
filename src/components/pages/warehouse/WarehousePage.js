@@ -1,5 +1,5 @@
 "use client";
-import WarehouseTable from '@/components/warehouse/WarehouseTable';
+import WarehouseTable from '@/components/modules/warehouse/WarehouseTable';
 import SideBar from "@/components/ui/SideBar";
 import Alert from '@/components/ui/Alert';
 import useWarehouseService from '@/services/warehouseService';

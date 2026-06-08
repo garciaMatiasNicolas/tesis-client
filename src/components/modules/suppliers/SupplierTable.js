@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { FaBuilding, FaPlus, FaEdit, FaTrash, FaSearch, FaEnvelope, FaPhone, FaGlobe, FaMapMarkerAlt, FaSpinner, FaDownload, FaUpload, FaFileExcel } from "react-icons/fa";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
-import SupplierModal from "@/components/suppliers/SupplierModal";
+import SupplierModal from "@/components/modules/suppliers/SupplierModal";
 import useSupplierService from '@/services/supplierService';
 
 export default function SupplierTable({ 

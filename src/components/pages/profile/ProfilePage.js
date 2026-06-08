@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import Alert from "@/components/ui/Alert";
 import { FaUser, FaStore, FaUsers, FaHome, FaList, FaPlus, FaBuilding } from "react-icons/fa";
 import UserForm from "@/components/profile/forms/UserForm";
-import StoreForm from "@/components/store/StoreForm";
+import StoreForm from "@/components/modules/store/StoreForm";
 import BranchesForm from "@/components/profile/forms/BranchesForm";
 import useApiMethods from "@/hooks/useApiMethods";
 import useUserService from "@/services/userService";

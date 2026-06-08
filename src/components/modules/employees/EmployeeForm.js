@@ -413,7 +413,7 @@ const EmployeeForm = ({
                     </div>
                     <button
                         type="button"
-                        className="absolute bottom-0 right-0 bg-[#18c29c] text-white rounded-full p-2 shadow hover:bg-[#13a884] transition"
+                        className="absolute bottom-0 right-0 bg-[#18c29c] text-white rounded-full p-2 shadow hover:bg-[#18c29c] transition"
                         onClick={() => fileInputRef.current.click()}
                         title="Cambiar foto"
                     >
@@ -959,7 +959,7 @@ const EmployeeForm = ({
                 </button>
                 <button
                     type="submit"
-                    className="px-6 py-3 bg-[#18c29c] hover:bg-[#13a884] text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
+                    className="px-6 py-3 bg-[#18c29c] hover:bg-[#18c29c] text-white rounded-lg font-semibold transition-colors flex items-center gap-2"
                     disabled={loading}
                 >
                     {loading ? (

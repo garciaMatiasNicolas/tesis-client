@@ -139,7 +139,7 @@ class SalesOrderService {
         return {
             customer_id: formData.customer_id,
             sales_channel: formData.sales_channel,
-            payment_method: formData.payment_method,
+            payment_method_id: formData.payment_method ? parseInt(formData.payment_method) : null,
             delivery: formData.with_shipping || false,
             delivery_date: formData.delivery_date,
             deliver_to: formData.deliver_to || '',

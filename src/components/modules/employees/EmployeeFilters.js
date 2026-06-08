@@ -44,7 +44,7 @@ const EmployeeFilters = ({
                 {canAdd && (
                     <button
                         onClick={onAddEmployee}
-                        className="bg-[#18c29c] hover:bg-[#13a884] text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap"
+                        className="bg-[#18c29c] hover:bg-[#18c29c] text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap"
                     >
                         <FaPlus />
                         Agregar Empleado

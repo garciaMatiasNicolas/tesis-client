@@ -17,9 +17,9 @@ import {
     FaFileInvoiceDollar,
     FaFilePdf
 } from "react-icons/fa";
-import CustomerDetailModal from "@/components/crm/CustomerDetailModal";
+import CustomerDetailModal from "@/components/modules/crm/CustomerDetailModal";
 import DeleteConfirmationModal from "@/components/ui/DeleteConfirmationModal";
-import SalesDetailModal from "@/components/admin/SalesDetailModal";
+import SalesDetailModal from "@/components/modules/admin/SalesDetailModal";
 import { formatPrice, formatDate } from "@/utils/formatData";
 
 export default function SalesTable({ 

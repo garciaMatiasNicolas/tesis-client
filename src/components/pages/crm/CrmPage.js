@@ -1,6 +1,6 @@
 "use client";
-import CustomerTable from '@/components/crm/CustomerTable';
-import CustomerFormModal from '@/components/crm/CustomerFormModal';
+import CustomerTable from '@/components/modules/crm/CustomerTable';
+import CustomerFormModal from '@/components/modules/crm/CustomerFormModal';
 import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
 import Alert from '@/components/ui/Alert';
 import SideBar from '@/components/ui/SideBar';

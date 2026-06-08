@@ -690,8 +690,8 @@ export default function SalesDetailModal({ isOpen, onClose, sale, onUpdateStatus
                                 {sale.payment_method && (
                                     <div className="mt-3">
                                         <span className="text-sm text-gray-600">Método de pago: </span>
-                                        <span className="text-sm font-medium text-gray-900 capitalize">
-                                            {sale.payment_method}
+                                        <span className="text-sm font-medium text-gray-900">
+                                            {sale.payment_method.name}
                                         </span>
                                     </div>
                                 )}

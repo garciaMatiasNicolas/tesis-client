@@ -3,7 +3,7 @@ import React, { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { FaArrowRight } from "react-icons/fa";
 import useApiMethods from "@/hooks/useApiMethods";
-import Alert from "../ui/Alert";
+import Alert from "../../ui/Alert";
 
 export default function Enable2FA({ qrData, otpLength = 6, email }) {
     const [step, setStep] = useState(1);
@@ -122,7 +122,7 @@ export default function Enable2FA({ qrData, otpLength = 6, email }) {
                         type="button"
                         onClick={() => setStep(2)}
                         style={{ cursor: "pointer" }}
-                        className="w-full bg-[#18c29c] hover:bg-[#13a884] text-white py-2 rounded-md font-semibold text-lg mt-4 transition disabled:opacity-60 disabled:cursor-not-allowed flex justify-center items-center gap-2"
+                        className="w-full bg-[#18c29c] hover:bg-[#18c29c] text-white py-2 rounded-md font-semibold text-lg mt-4 transition disabled:opacity-60 disabled:cursor-not-allowed flex justify-center items-center gap-2"
                     >
                         Siguiente <FaArrowRight   />
                     </button>
@@ -140,7 +140,7 @@ export default function Enable2FA({ qrData, otpLength = 6, email }) {
                         type="button"
                         onClick={() => setStep(3)}
                         style={{ cursor: "pointer" }}
-                        className="w-full bg-[#18c29c] hover:bg-[#13a884] text-white py-2 rounded-md font-semibold text-lg mt-4 transition flex justify-center items-center gap-2"
+                        className="w-full bg-[#18c29c] hover:bg-[#18c29c] text-white py-2 rounded-md font-semibold text-lg mt-4 transition flex justify-center items-center gap-2"
                     >
                         Mostrar QR <FaArrowRight   />
                     </button>
@@ -167,7 +167,7 @@ export default function Enable2FA({ qrData, otpLength = 6, email }) {
                         type="button" 
                         style={{ cursor: "pointer" }}
                         onClick={() => setStep(4)}
-                        className="w-full bg-[#18c29c] hover:bg-[#13a884] text-white py-2 rounded-md font-semibold text-lg mt-4 transition flex justify-center items-center gap-2"
+                        className="w-full bg-[#18c29c] hover:bg-[#18c29c] text-white py-2 rounded-md font-semibold text-lg mt-4 transition flex justify-center items-center gap-2"
                     >
                         Probar 2FA <FaArrowRight   />
                     </button>
@@ -202,7 +202,7 @@ export default function Enable2FA({ qrData, otpLength = 6, email }) {
                         type="button"
                         onClick={handleFinish}
                         style={{ cursor: "pointer" }}
-                        className="w-full bg-[#18c29c] hover:bg-[#13a884] text-white py-2 rounded-md font-semibold text-lg mt-4 transition flex justify-center items-center gap-2"
+                        className="w-full bg-[#18c29c] hover:bg-[#18c29c] text-white py-2 rounded-md font-semibold text-lg mt-4 transition flex justify-center items-center gap-2"
                     >
                         Validar codigo en ingresar <FaArrowRight   />
                     </button>

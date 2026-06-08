@@ -120,7 +120,7 @@ export default function StoreForm({ store, onChange, onSave, loading = false, re
                         </div>
                         <div className="text-center sm:text-left">
                             {!readOnly && (
-                                <label className="inline-flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 bg-[#18c29c] text-white rounded-md cursor-pointer hover:bg-[#13a884] transition text-sm md:text-base">
+                                <label className="inline-flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 bg-[#18c29c] text-white rounded-md cursor-pointer hover:bg-[#18c29c] transition text-sm md:text-base">
                                     <FaUpload className="text-xs md:text-sm" />
                                     Subir logo
                                     <input
@@ -416,7 +416,7 @@ export default function StoreForm({ store, onChange, onSave, loading = false, re
                         <div className="flex items-start sm:items-center justify-between gap-3">
                             <div className="flex-1">
                                 <h4 className="text-sm md:text-base font-semibold text-[#223263]">Solo lectura</h4>
-                                <p className="text-xs md:text-sm text-gray-600 mt-1">Los clientes pueden ver productos pero no comprar. De esta manera, tu tienda funciona como una especie de catalogo para los clientes</p>
+                                <p className="text-xs md:text-sm text-gray-600 mt-1">Los clientes pueden ver productos pero no comprar. De esta manera, tu tienda funciona como una especie de catalogo para los clientes. Al desactivar esta opción, los clientes podrán realizar compras directamente desde la plataforma integrando la pasarela de pago de mercado pago.</p>
                             </div>
                             <button
                                 type="button"
@@ -441,7 +441,7 @@ export default function StoreForm({ store, onChange, onSave, loading = false, re
                             className={`w-full sm:w-auto px-8 md:px-12 py-3 md:py-4 text-white font-semibold rounded-lg transition-colors text-base md:text-lg flex items-center justify-center gap-2 ${
                                 loading 
                                     ? 'bg-gray-400 cursor-not-allowed' 
-                                    : 'bg-[#18c29c] hover:bg-[#13a884]'
+                                    : 'bg-[#18c29c] hover:bg-[#18c29c]'
                             }`}
                         >
                             {loading && <FaSpinner className="animate-spin" />}

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import SalesTable from '@/components/admin/SalesTable';
-import SalesFormModal from '@/components/admin/SalesFormModal';
+import SalesTable from '@/components/modules/admin/SalesTable';
+import SalesFormModal from '@/components/modules/admin/SalesFormModal';
 import SideBar from '@/components/ui/SideBar';
 import Alert from '@/components/ui/Alert';
 import useApiMethods from '@/hooks/useApiMethods';

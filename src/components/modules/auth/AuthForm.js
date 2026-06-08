@@ -154,7 +154,7 @@ export default function AuthForm({
                 type="submit"
                 style={{ cursor: "pointer" }}
                 disabled={loading}
-                className="w-full bg-[#18c29c] hover:bg-[#13a884] text-white py-2 rounded-md font-semibold text-lg mb-4 transition disabled:opacity-60"
+                className="w-full bg-[#18c29c] hover:bg-[#18c29c] text-white py-2 rounded-md font-semibold text-lg mb-4 transition disabled:opacity-60"
             >
                 {loading ? "Cargando..." : showOtp ? "Verificar código" : "Iniciar sesión"}
             </button>
