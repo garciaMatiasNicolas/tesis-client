@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import SupplierTable from '@/components/suppliers/SupplierTable';
+import SupplierTable from '@/components/modules/suppliers/SupplierTable';
 import SideBar from '@/components/ui/SideBar';
 import Alert from '@/components/ui/Alert';
 import Pagination from '@/components/ui/Pagination';

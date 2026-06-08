@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import SideBar from "@/components/ui/SideBar";
-import ProductForm from "@/components/products/ProductForm";
+import ProductForm from "@/components/modules/products/ProductForm";
 import useProductService from "@/services/productService";
 import { FaHome, FaBoxes, FaPlus, FaList, FaTag, FaWarehouse, FaEdit, FaSpinner } from "react-icons/fa";
 

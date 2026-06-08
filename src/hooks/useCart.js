@@ -8,28 +8,49 @@ const CartContext = createContext();
 // Proveedor del contexto
 export function CartProvider({ children }) {
     const [cart, setCart] = useState([]);
+    const [isCartLoaded, setIsCartLoaded] = useState(false);
     const ecommerceService = useEcommerceService();
-    
+
     // Cargar carrito desde localStorage cuando se inicia
     useEffect(() => {
         try {
+            const timestamp = localStorage.getItem('cartTimestamp');
+            if (timestamp) {
+                const twoHoursMs = 2 * 60 * 60 * 1000;
+                if (Date.now() - parseInt(timestamp) > twoHoursMs) {
+                    localStorage.removeItem('cart');
+                    localStorage.removeItem('cartTimestamp');
+                    setIsCartLoaded(true);
+                    return;
+                }
+            }
             const storedCart = localStorage.getItem('cart');
             if (storedCart) {
                 setCart(JSON.parse(storedCart));
             }
         } catch (error) {
             console.error("Error al cargar el carrito desde localStorage:", error);
+        } finally {
+            setIsCartLoaded(true);
         }
     }, []);
     
-    // Guardar carrito en localStorage cuando cambia
+    // Guardar carrito en localStorage cuando cambia.
+    // El guard de isCartLoaded evita que el estado inicial vacío (cart=[])
+    // sobreescriba el carrito guardado ANTES de que el effect de carga lo restaure.
     useEffect(() => {
+        if (!isCartLoaded) return;
         try {
             localStorage.setItem('cart', JSON.stringify(cart));
+            // Refrescar el timestamp siempre que el carrito tenga items,
+            // así la expiración de 2 h se cuenta desde la última modificación real.
+            if (cart.length > 0) {
+                localStorage.setItem('cartTimestamp', Date.now().toString());
+            }
         } catch (error) {
             console.error("Error al guardar el carrito en localStorage:", error);
         }
-    }, [cart]);
+    }, [cart, isCartLoaded]);
     
     // Función para añadir un producto al carrito
     const addToCart = (product) => {
@@ -125,6 +146,7 @@ export function CartProvider({ children }) {
     // Valor que se expone en el contexto
     const value = {
         cart,
+        isCartLoaded,
         addToCart,
         updateQuantity,
         removeFromCart,

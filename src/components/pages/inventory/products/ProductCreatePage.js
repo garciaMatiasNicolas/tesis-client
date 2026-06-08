@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import { useRouter } from "next/navigation";
-import ProductForm from "@/components/products/ProductForm";
+import ProductForm from "@/components/modules/products/ProductForm";
 import SideBar from "@/components/ui/SideBar";
 
 export default function ProductCreatePage() {

@@ -52,6 +52,7 @@ export const getSidebarItems = (router) => [
     icon: <FaStore />,
     dropdown: [
       { label: "Configurar tienda", icon: <FaCog />, onClick: () => router.push("/profile?section=store") },
+      { label: "Métodos de pago", icon: <FaFileInvoiceDollar />, onClick: () => router.push("/payments") },
     ],
   },
   { label: "Empleados", icon: <FaUsers />, onClick: () => router.push("/employees") },

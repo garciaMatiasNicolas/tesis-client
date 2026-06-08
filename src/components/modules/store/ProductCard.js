@@ -102,7 +102,10 @@ const ProductCard = ({ product, onAddToCart, isDarkMode = true, theme }) => {
             {/* Botones de acción - siempre al final */}
             <div className="flex gap-2 mt-auto">
             <button
-                onClick={() => !isOutOfStock && onAddToCart(product)}
+                onClick={() => {
+                    if (isOutOfStock) return;
+                    onAddToCart(product);
+                }}
                 disabled={isOutOfStock}
                 style={{ 
                     background: isOutOfStock ? '#6b7280' : theme.primary.gradient, 

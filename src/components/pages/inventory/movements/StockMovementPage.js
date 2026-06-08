@@ -1,6 +1,6 @@
 "use client";
 import SideBar from '@/components/ui/SideBar';
-import StockMovementTable from '@/components/stock/StockMovementTable';
+import StockMovementTable from '@/components/modules/stock/StockMovementTable';
 import React, { useState } from 'react';
 
 const StockMovementPage = () => {

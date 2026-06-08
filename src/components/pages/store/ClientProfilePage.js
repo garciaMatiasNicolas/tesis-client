@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStoreWithTheme } from '@/hooks/useStore';
 import { isAuthenticated } from '@/services/auth';
-import StoreHeader from '@/components/store/StoreHeader';
+import StoreHeader from '@/components/modules/store/StoreHeader';
 import useApiMethods from '@/hooks/useApiMethods';
 import useEcommerceService from '@/services/ecommerceService';
 import Alert from '@/components/ui/Alert';
@@ -192,6 +192,20 @@ const ClientProfilePage = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const getPaymentStatusInfo = (order) => {
+        if (order.was_payed) {
+            return { text: 'Pagado', color: '#10b981', bg: '#d1fae5' };
+        }
+        const provider = order.payment_method?.provider;
+        if (provider === 'bank_transfer') {
+            return { text: 'Pendiente de confirmación', color: '#d97706', bg: '#fef3c7' };
+        }
+        if (provider === 'cash') {
+            return { text: 'Pendiente', color: '#6b7280', bg: '#f3f4f6' };
+        }
+        return { text: 'No pagado', color: '#ef4444', bg: '#fee2e2' };
     };
 
     const getStatusColor = (status) => {
@@ -812,15 +826,24 @@ const ClientProfilePage = () => {
                                                                 {new Date(order.created_at).toLocaleDateString()}
                                                             </p>
                                                         </div>
-                                                        <div className="text-right">
+                                                        <div className="flex flex-col items-end gap-1.5">
                                                             <div className="px-3 py-1 rounded-full text-sm font-medium text-white"
                                                                 style={{ backgroundColor: getStatusColor(order.status) }}>
                                                                 {getStatusText(order.status)}
                                                             </div>
-                                                            <p className="text-lg font-bold mt-2"
-                                                                style={{ 
-                                                                    color: isDarkMode 
-                                                                        ? theme.text?.dark?.primary || '#ffffff' 
+                                                            {(() => {
+                                                                const ps = getPaymentStatusInfo(order);
+                                                                return (
+                                                                    <div className="px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                                                        style={{ backgroundColor: ps.bg, color: ps.color }}>
+                                                                        💳 {ps.text}
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                            <p className="text-lg font-bold"
+                                                                style={{
+                                                                    color: isDarkMode
+                                                                        ? theme.text?.dark?.primary || '#ffffff'
                                                                         : theme.text?.light?.primary || '#252525'
                                                                 }}>
                                                                 ${parseFloat(order.total_price).toFixed(2)}

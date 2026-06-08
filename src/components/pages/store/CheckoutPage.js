@@ -4,27 +4,68 @@ import { useRouter } from 'next/navigation';
 import { useTheme } from '@/hooks/useTheme';
 import { useCart } from '@/hooks/useCart';
 import { useStore } from '@/hooks/useStore';
-import StoreHeader from '@/components/store/StoreHeader';
-import ShoppingCart from '@/components/store/ShoppingCart';
-import UserCreateModal from '@/components/store/UserCreateModal';
-import UserLoginModal from '@/components/store/UserLoginModal';
+import StoreHeader from '@/components/modules/store/StoreHeader';
+import ShoppingCart from '@/components/modules/store/ShoppingCart';
+import UserCreateModal from '@/components/modules/store/UserCreateModal';
+import UserLoginModal from '@/components/modules/store/UserLoginModal';
+import PaymentGateway from '@/components/modules/store/PaymentGateway';
 import useEcommerceService from '@/services/ecommerceService';
-import { isAuthenticated, removeAuthToken } from '@/services/auth';
-import { FaWhatsapp } from 'react-icons/fa';
+import { isAuthenticated } from '@/services/auth';
+import { FaArrowLeft, FaLock } from 'react-icons/fa';
 import { formatPrice } from '@/utils/formatData';
+import Alert from '@/components/ui/Alert';
 
+
+// ── Mapeo de status_detail de MP a mensajes legibles para el usuario ──────────
+const MP_REJECTION_MESSAGES = {
+    // Datos de tarjeta incorrectos
+    cc_rejected_bad_filled_card_number: 'El número de tarjeta es incorrecto. Verificalo e intentá nuevamente.',
+    cc_rejected_bad_filled_security_code: 'El código de seguridad (CVV) es incorrecto.',
+    cc_rejected_bad_filled_date: 'La fecha de vencimiento es incorrecta.',
+    cc_rejected_form_error: 'Revisá que el número de tarjeta, el CVV y la fecha de vencimiento estén correctos.',
+    // Rechazos del banco
+    cc_rejected_call_for_authorize: 'Tu banco requiere que autorices esta compra. Llamá al número del dorso de tu tarjeta y volvé a intentarlo.',
+    cc_rejected_insufficient_amount: 'Tu tarjeta no tiene fondos suficientes para este pago.',
+    cc_rejected_other_reason: 'Tu banco rechazó el pago. Verificá que tu tarjeta esté habilitada para compras online, o intentá con otra.',
+    cc_rejected_blacklist: 'Tu tarjeta no está habilitada para este tipo de operación. Contactá a tu banco.',
+    cc_rejected_max_attempts: 'Superaste el límite de intentos. Esperá unos minutos o usá otra tarjeta.',
+    cc_rejected_card_disabled: 'Tu tarjeta está deshabilitada. Contactá a tu banco.',
+    rejected_by_bank: 'Tu banco rechazó el pago. Contactá a tu banco para más información.',
+    rejected_by_regulations: 'El pago fue rechazado por regulaciones. Intentá con otro medio de pago.',
+};
+
+const MP_PENDING_MESSAGES = {
+    pending_contingency: 'Tu banco está procesando el pago. Esto puede demorar unos minutos — te notificaremos el resultado.',
+    pending_review_manual: 'Tu pago está en revisión manual. Te notificaremos el resultado en las próximas horas.',
+};
+
+const getMpMessage = (statusDetail, type = 'rejected') => {
+    const map = type === 'rejected' ? MP_REJECTION_MESSAGES : MP_PENDING_MESSAGES;
+    return map[statusDetail] || (
+        type === 'rejected'
+            ? 'El pago fue rechazado. Intentá con otra tarjeta o contactá a tu banco.'
+            : 'Tu pago está siendo procesado. Te notificaremos el resultado.'
+    );
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const CheckoutPage = () => {
     const router = useRouter();
     const { isDarkMode, theme } = useTheme();
-    const { cart, addToCart, updateQuantity, removeFromCart, clearCart, getTotalPrice, getTotalCartItems } = useCart();
-    const { 
-        createUserForCustomerAndLogIn, 
-        completeCheckout, 
-        checkUserByEmail, 
+    const { cart, isCartLoaded, updateQuantity, removeFromCart, clearCart, getTotalPrice, getTotalCartItems } = useCart();
+    const {
+        createUserForCustomerAndLogIn,
+        completeCheckout,
+        cancelEcommerceOrder,
+        getMpPaymentStatus,
+        checkUserByEmail,
         loginUser,
         createCustomer,
-        getCustomerData
+        getCustomerData,
+        getStorePaymentMethods,
+        processMercadoPagoCard,
+        createMercadoPagoPreference,
     } = useEcommerceService();
     const { storeConfig } = useStore();
     //const { getMethod } = useApiMethods();
@@ -44,107 +85,52 @@ const CheckoutPage = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [orderPlaced, setOrderPlaced] = useState(false);
     const [isCartOpen, setIsCartOpen] = useState(false);
-    const [showExitModal, setShowExitModal] = useState(false);
     const [showUserCreateModal, setShowUserCreateModal] = useState(false);
     const [showUserLoginModal, setShowUserLoginModal] = useState(false);
     const [user, setUser] = useState(null);
     const [existingUser, setExistingUser] = useState(null);
     const [isUserAuthenticated, setIsUserAuthenticated] = useState(false);
     const [isLoadingUserData, setIsLoadingUserData] = useState(false);
+    // Step del gateway de pago
+    const [paymentStep, setPaymentStep] = useState(false);
+    const [createdOrderId, setCreatedOrderId] = useState(null);
+    const [paymentAlert, setPaymentAlert] = useState(null); // { type, title, message }
+    const [orderPaymentType, setOrderPaymentType] = useState(null); // 'card'|'card_pending'|'bank_transfer'|'cash'|'whatsapp'
+    const [mpBrickResetKey, setMpBrickResetKey] = useState(0); // incrementar para reinicializar el Brick tras fallo
+    // Estado del polling para pagos pendientes (CONT / pending_contingency)
+    const [pendingPaymentData, setPendingPaymentData] = useState(null); // { paymentId, orderId, detail }
+    const [pollCount, setPollCount] = useState(0);
+
+    const isViewOnly = storeConfig?.view_only ?? true;
 
     // Si el carrito está vacío, redirigir a la tienda
     useEffect(() => {
+        if (!isCartLoaded) return;
         if (cart.length === 0 && !orderPlaced) {
             router.push('/store');
         }
-    }, [cart, orderPlaced, router]);
+    }, [cart, isCartLoaded, orderPlaced, router]);
     
-    // Detectar cuando el usuario intenta salir de la página
+    // Mantener el timestamp del carrito actualizado y verificar expiración periódicamente
     useEffect(() => {
-        // Guardar timestamp del carrito actual
         if (cart.length > 0 && !orderPlaced) {
             localStorage.setItem('cartTimestamp', Date.now().toString());
         }
-        
-        // Comprobar y eliminar carritos antiguos (más de 2 horas)
-        const checkCartExpiry = () => {
-            const timestamp = localStorage.getItem('cartTimestamp');
-            if (timestamp) {
-                const cartTime = parseInt(timestamp);
-                const currentTime = Date.now();
-                const twoHoursMs = 2 * 60 * 60 * 1000; // 2 horas en milisegundos
-                
-                if (currentTime - cartTime > twoHoursMs) {
-                    clearCart();
-                    localStorage.removeItem('cartTimestamp');
-                }
-            }
-        };
-        
-        checkCartExpiry();
-        
-        // Mostrar modal cuando el usuario intenta cerrar o recargar la página
-        const handleBeforeUnload = (e) => {
-            if (cart.length > 0 && !orderPlaced && !isSubmitting) {
-                e.preventDefault();
-                e.returnValue = '';
-                return '';
-            }
-        };
-        
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        
-        return () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-        };
-    }, [cart, orderPlaced, isSubmitting, clearCart]);
-    
-    // Manejar navegación dentro de la app (botón atrás del navegador)
-    useEffect(() => {
-        const handleUserExit = () => {
-            if (cart.length > 0 && !orderPlaced && !isSubmitting) {
-                setShowExitModal(true);
-            }
-        };
-        
-        // Configurar intervalo para revisar si el carrito expiró
+
         const checkExpiryInterval = setInterval(() => {
             const timestamp = localStorage.getItem('cartTimestamp');
             if (timestamp) {
-                const cartTime = parseInt(timestamp);
-                const currentTime = Date.now();
-                const twoHoursMs = 2 * 60 * 60 * 1000; // 2 horas en milisegundos
-                
-                if (currentTime - cartTime > twoHoursMs) {
+                const twoHoursMs = 2 * 60 * 60 * 1000;
+                if (Date.now() - parseInt(timestamp) > twoHoursMs) {
                     clearCart();
                     localStorage.removeItem('cartTimestamp');
-                    alert('Tu carrito ha sido eliminado por inactividad (2 horas).');
                     router.push('/store');
                 }
             }
-        }, 60000); // Verificar cada minuto
-        
-        // Usar el evento popstate para detectar cuando el usuario usa el botón de retroceso
-        const handlePopState = (event) => {
-            if (cart.length > 0 && !orderPlaced && !isSubmitting) {
-                event.preventDefault();
-                handleUserExit();
-                // Prevenir navegación agregando un nuevo estado que mantenga al usuario en la página actual
-                window.history.pushState(null, "", window.location.pathname);
-            }
-        };
-        
-        // Asegurar que estamos en la parte superior del historial
-        window.history.pushState(null, "", window.location.pathname);
-        
-        // Añadir listener para el evento popstate
-        window.addEventListener('popstate', handlePopState);
-        
-        return () => {
-            clearInterval(checkExpiryInterval);
-            window.removeEventListener('popstate', handlePopState);
-        };
-    }, [cart, router, orderPlaced, isSubmitting, clearCart]);
+        }, 60000);
+
+        return () => clearInterval(checkExpiryInterval);
+    }, [cart, orderPlaced, clearCart, router]);
 
     // Verificar autenticación y cargar datos del cliente
     useEffect(() => {
@@ -231,6 +217,57 @@ const CheckoutPage = () => {
         return Object.keys(errors).length === 0;
     };
     
+    // ── Polling: verificar estado de pagos pendientes (CONT / pending_review_manual) ──
+    // Máximo 30 intentos × 10 s = 5 minutos. Si no resuelve en ese tiempo, redirige
+    // al perfil con el estado "pendiente" y el webhook actualizará cuando MP confirme.
+    useEffect(() => {
+        if (!pendingPaymentData) return;
+
+        const MAX_POLLS = 30;
+
+        if (pollCount >= MAX_POLLS) {
+            // Tiempo agotado: el webhook actualizará cuando MP responda
+            setOrderPaymentType('card_pending');
+            setOrderPlaced(true);
+            setPendingPaymentData(null);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            try {
+                const result = await getMpPaymentStatus(pendingPaymentData.paymentId);
+                const finalStatus = result?.status;
+
+                if (finalStatus === 'approved') {
+                    setOrderPaymentType('card');
+                    setOrderPlaced(true);
+                    setPendingPaymentData(null);
+                } else if (finalStatus === 'rejected' || finalStatus === 'cancelled') {
+                    // Cancelar la orden draft (el pago no prosperó)
+                    await cancelEcommerceOrder(pendingPaymentData.orderId).catch(() => {});
+                    setCreatedOrderId(null);
+                    setMpBrickResetKey(k => k + 1);
+                    setPendingPaymentData(null);
+                    setPaymentAlert({
+                        type: 'danger',
+                        title: 'Pago rechazado',
+                        message: 'Tu banco rechazó el pago luego de la revisión. Podés intentar nuevamente con otra tarjeta.',
+                    });
+                    setIsSubmitting(false);
+                    // Volver al paso de pago para que pueda reintentar
+                    setPaymentStep(true);
+                } else {
+                    // Sigue pendiente: incrementar contador y esperar siguiente ciclo
+                    setPollCount(c => c + 1);
+                }
+            } catch {
+                setPollCount(c => c + 1); // error de red: reintentar
+            }
+        }, 10000);
+
+        return () => clearTimeout(timer);
+    }, [pendingPaymentData, pollCount]);
+
     // Función para generar el mensaje de WhatsApp
     const generateWhatsAppMessage = () => {
         let message = `¡Hola! Me gustaría hacer un pedido desde la tienda ${storeConfig?.name || 'su tienda'}:\n\n`;
@@ -257,15 +294,6 @@ const CheckoutPage = () => {
         return encodeURIComponent(message);
     };
     
-    const handleExit = () => {
-        setShowExitModal(false);
-        router.push('/store');
-    };
-    
-    const handleContinueShopping = () => {
-        setShowExitModal(false);
-    };
-
     const handleLoginFromHeader = () => {
         // Limpiar estados del formulario y mostrar modal de login
         setExistingUser({ email: '' });
@@ -309,9 +337,13 @@ const CheckoutPage = () => {
             };
 
             setShowUserCreateModal(false);
-            
-            // Después de crear el usuario/cliente, procesar el checkout automáticamente
-            await processCompleteCheckout();
+
+            if (isViewOnly) {
+                await processCompleteCheckout(null, 'whatsapp');
+                setIsSubmitting(false);
+            } else {
+                goToPaymentStep();
+            }
             
         } catch (error) {
             setIsSubmitting(false); // Desactivar loading en caso de error
@@ -336,8 +368,13 @@ const CheckoutPage = () => {
             // Solo procesar checkout si el login viene del formulario de checkout
             // (existingUser tendrá email del formulario)
             if (existingUser && existingUser.email && existingUser.email !== '') {
-                setIsSubmitting(true);
-                await processCompleteCheckout();
+                if (isViewOnly) {
+                    setIsSubmitting(true);
+                    await processCompleteCheckout(null, 'whatsapp');
+                    setIsSubmitting(false);
+                } else {
+                    goToPaymentStep();
+                }
             }
             // Si existingUser.email está vacío, significa que vino del header, no hacer checkout
             
@@ -347,31 +384,152 @@ const CheckoutPage = () => {
         }
     };
 
-    const processCompleteCheckout = async () => {
-        try {
-            // Para tiendas con checkout completo, usar el backend
-            await completeCheckout(formData, cart);
-            
-            // Enviar mensaje de WhatsApp con los detalles del pedido
+    // Ir al step de pago (se llama luego de validar el formulario y la auth)
+    const goToPaymentStep = () => {
+        setIsSubmitting(false);
+        setPaymentStep(true);
+    };
 
-            if (storeConfig?.phone) {
+    // Finalizar el pedido para métodos sin tarjeta (efectivo, transferencia) o view_only (WhatsApp)
+    const processCompleteCheckout = async (paymentMethodId = null, paymentType = 'whatsapp') => {
+        try {
+            const result = await completeCheckout(formData, cart, paymentMethodId);
+            const orderId = result?.salesOrder?.id;
+            if (orderId) setCreatedOrderId(orderId);
+
+            if (paymentType === 'whatsapp' && storeConfig?.phone) {
                 const whatsappNumber = storeConfig.phone.replace(/[^0-9]/g, '');
                 const message = generateWhatsAppMessage();
-                
-                // Abrir WhatsApp en una nueva pestaña
                 window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
             }
-            
+
+            setOrderPaymentType(paymentType);
             setOrderPlaced(true);
             clearCart();
-            
-            setTimeout(() => {
-                router.push('/store');
-            }, 5000);
-            
+            setTimeout(() => router.push('/store/profile'), 5000);
         } catch (error) {
             console.error('Error al procesar checkout:', error);
-            alert('Error al procesar el pedido. Por favor, inténtalo de nuevo.');
+            setPaymentAlert({
+                type: 'danger',
+                title: 'Error al procesar el pedido',
+                message: 'Ocurrió un error al registrar tu pedido. Por favor, inténtalo de nuevo.',
+            });
+        }
+    };
+
+    // Procesar pago con tarjeta via MP Bricks
+    const handleCardPayment = async (brickFormData) => {
+        setIsSubmitting(true);
+        let attemptOrderId = null;
+        try {
+            // 1. Crear la orden si no existe aún para este intento
+            let orderId = createdOrderId;
+            if (!orderId) {
+                const result = await completeCheckout(formData, cart);
+                orderId = result?.salesOrder?.id;
+                attemptOrderId = orderId;
+                setCreatedOrderId(orderId);
+            }
+            // 2. Procesar el pago con el token generado por el Brick
+            const paymentResult = await processMercadoPagoCard(orderId, brickFormData);
+
+            if (paymentResult?.payment_status === 'approved') {
+                setOrderPaymentType('card');
+                setOrderPlaced(true);
+                clearCart();
+                setTimeout(() => router.push('/store/profile'), 5000);
+
+            } else if (paymentResult?.payment_status === 'rejected') {
+                // Eliminar la orden draft para que el siguiente intento empiece limpio
+                await cancelEcommerceOrder(orderId);
+                setCreatedOrderId(null);
+                setMpBrickResetKey(k => k + 1);
+
+                const detail = paymentResult?.status_detail || '';
+                setPaymentAlert({
+                    type: 'danger',
+                    title: 'Pago rechazado',
+                    message: getMpMessage(detail, 'rejected'),
+                });
+                setIsSubmitting(false);
+
+            } else {
+                // pending / in_process (ej: CONT = pending_contingency)
+                // El pago está siendo procesado — NO cancelar la orden, el webhook la actualizará.
+                // Activar el polling para mostrar el resultado cuando el banco responda.
+                const detail = paymentResult?.status_detail || '';
+                clearCart();
+                setIsSubmitting(false);
+                setPaymentAlert({
+                    type: 'warning',
+                    title: 'Pago en proceso',
+                    message: getMpMessage(detail, 'pending'),
+                    autoClose: false,
+                });
+                setPollCount(0);
+                setPendingPaymentData({
+                    paymentId: paymentResult.payment_id,
+                    orderId,
+                    detail,
+                });
+            }
+        } catch (error) {
+            // Eliminar la orden si fue creada en este intento
+            const orderToCancel = attemptOrderId || createdOrderId;
+            if (orderToCancel) {
+                await cancelEcommerceOrder(orderToCancel).catch(() => {});
+                setCreatedOrderId(null);
+            }
+            setMpBrickResetKey(k => k + 1); // reinicia el Brick para desbloquear el botón
+            console.error('Error al procesar pago con tarjeta:', error);
+            setPaymentAlert({
+                type: 'danger',
+                title: 'Error al procesar el pago',
+                message: 'No se pudo conectar con la pasarela de pago. Verificá tu conexión e intentá nuevamente.',
+            });
+            setIsSubmitting(false);
+        }
+    };
+
+    // Confirmar método sin tarjeta (efectivo / transferencia)
+    const handleNonCardConfirm = async (method) => {
+        setIsSubmitting(true);
+        try {
+            await processCompleteCheckout(method?.id || null, method?.provider || 'cash');
+        } catch {
+            setIsSubmitting(false);
+        }
+    };
+
+    // Pago con cuenta de Mercado Pago — flujo redirect (Checkout Pro)
+    const handleMpAccountPayment = async () => {
+        setIsSubmitting(true);
+        let attemptOrderId = null;
+        try {
+            let orderId = createdOrderId;
+            if (!orderId) {
+                const result = await completeCheckout(formData, cart);
+                orderId = result?.salesOrder?.id;
+                attemptOrderId = orderId;
+                setCreatedOrderId(orderId);
+            }
+            const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+            const mpResult = await createMercadoPagoPreference(orderId, baseUrl);
+            const initPoint = mpResult?.init_point;
+            if (!initPoint) throw new Error('No se recibió el link de pago de Mercado Pago.');
+            clearCart();
+            window.location.href = initPoint;
+        } catch (error) {
+            if (attemptOrderId) {
+                await cancelEcommerceOrder(attemptOrderId).catch(() => {});
+                setCreatedOrderId(null);
+            }
+            setPaymentAlert({
+                type: 'danger',
+                title: 'Error al iniciar el pago',
+                message: 'No se pudo conectar con Mercado Pago. Verificá tu conexión e intentá nuevamente.',
+            });
+            setIsSubmitting(false);
         }
     };
 
@@ -384,9 +542,13 @@ const CheckoutPage = () => {
 
         try {
             if (isUserAuthenticated) {
-                // Usuario autenticado -> procesar checkout directamente
-                setIsSubmitting(true);
-                await processCompleteCheckout();
+                if (isViewOnly) {
+                    setIsSubmitting(true);
+                    await processCompleteCheckout(null, 'whatsapp');
+                    setIsSubmitting(false);
+                } else {
+                    goToPaymentStep();
+                }
                 return;
             }
 
@@ -409,75 +571,136 @@ const CheckoutPage = () => {
         }
     };
     
-    // Si el pedido fue colocado con éxito
-    if (orderPlaced) {
+    // ── Pantalla de verificación de pago (polling activo) ──
+    if (pendingPaymentData) {
+        const bgMain = isDarkMode ? theme.background?.dark?.main || '#121212' : theme.background?.light?.main || '#f8f5f0';
+        const cardBg = isDarkMode ? theme.background?.dark?.card || '#1e1e1e' : theme.background?.light?.card || '#ffffff';
+        const borderCol = isDarkMode ? theme.border?.dark?.main || '#3a3a3a' : theme.border?.light?.main || '#e0e0e0';
+        const textPri = isDarkMode ? theme.text?.dark?.primary || '#ffffff' : theme.text?.light?.primary || '#252525';
+        const textSec = isDarkMode ? theme.text?.dark?.secondary || '#e0e0e0' : theme.text?.light?.secondary || '#3e3e3e';
+        const spinColor = theme.primary?.light?.main || '#9a334d';
+
         return (
-            <div className="min-h-screen flex flex-col transition-colors duration-300"
-                style={{ 
-                    backgroundColor: isDarkMode 
-                        ? theme.background?.dark?.main || '#121212' 
-                        : theme.background?.light?.main || '#f8f5f0',
-                    color: isDarkMode 
-                        ? theme.text?.dark?.primary || '#ffffff' 
-                        : theme.text?.light?.primary || '#252525'
-                }}>
-                <StoreHeader 
-                    isDarkMode={isDarkMode}
-                    storeConfig={storeConfig}
-                    theme={theme}
-                    getTotalCartItems={() => 0}
-                    onLoginClick={handleLoginFromHeader}
-                />
-                
+            <div className="min-h-screen flex flex-col" style={{ backgroundColor: bgMain }}>
+                <StoreHeader isDarkMode={isDarkMode} storeConfig={storeConfig} theme={theme} getTotalCartItems={() => 0} onLoginClick={handleLoginFromHeader} />
                 <div className="flex-1 flex items-center justify-center p-4">
-                    <div className="max-w-md w-full text-center p-8 rounded-lg shadow-lg"
-                        style={{ 
-                            backgroundColor: isDarkMode 
-                                ? theme.background?.dark?.card || '#1e1e1e' 
-                                : theme.background?.light?.card || '#ffffff',
-                            borderColor: isDarkMode 
-                                ? theme.border?.dark?.main || '#3a3a3a' 
-                                : theme.border?.light?.main || '#e0e0e0',
-                            border: '1px solid'
-                        }}>
-                        <div className="mx-auto w-16 h-16 rounded-full mb-4 flex items-center justify-center"
-                            style={{ background: theme.primary?.gradient || 'linear-gradient(135deg, #9a334d 0%, #7a2639 100%)' }}>
-                            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
+                    <div className="max-w-md w-full text-center p-8 rounded-xl shadow-lg"
+                        style={{ backgroundColor: cardBg, border: `1px solid ${borderCol}` }}>
+                        {/* Spinner animado */}
+                        <div className="w-16 h-16 mx-auto mb-6 relative">
+                            <div className="w-16 h-16 rounded-full border-4 border-gray-200 absolute inset-0" />
+                            <div className="w-16 h-16 rounded-full border-4 border-t-transparent animate-spin absolute inset-0"
+                                style={{ borderColor: `${spinColor} transparent transparent transparent` }} />
                         </div>
-                        <h2 className="text-2xl font-bold mb-2"
-                            style={{ 
-                                color: isDarkMode 
-                                    ? theme.text?.dark?.primary || '#ffffff' 
-                                    : theme.text?.light?.primary || '#252525'
-                            }}>
-                            ¡Pedido realizado con éxito!
+                        <h2 className="text-xl font-bold mb-2" style={{ color: textPri }}>
+                            Verificando tu pago...
                         </h2>
-                        <p className="mb-6"
-                            style={{ 
-                                color: isDarkMode 
-                                    ? theme.text?.dark?.secondary || '#e0e0e0' 
-                                    : theme.text?.light?.secondary || '#3e3e3e'
-                            }}>
-                            Tu pedido ha sido enviado a WhatsApp. Te contactaremos pronto.
+                        <p className="text-sm mb-1" style={{ color: textSec }}>
+                            {getMpMessage(pendingPaymentData.detail, 'pending')}
                         </p>
-                        <button 
-                            onClick={() => router.push('/store')}
-                            className="px-6 py-2 rounded-md text-white font-medium transition-all hover:shadow-lg"
-                            style={{ background: theme.primary?.gradient || 'linear-gradient(135deg, #9a334d 0%, #7a2639 100%)' }}>
-                            Volver a la tienda
+                        <p className="text-xs mb-6" style={{ color: textSec }}>
+                            Consultando al banco cada 10 segundos · {Math.max(0, 30 - pollCount) * 10}s restantes
+                        </p>
+                        <button
+                            onClick={() => {
+                                setOrderPaymentType('card_pending');
+                                setOrderPlaced(true);
+                                setPendingPaymentData(null);
+                            }}
+                            className="text-sm underline hover:no-underline"
+                            style={{ color: textSec }}>
+                            No quiero esperar — ir a mis pedidos
                         </button>
                     </div>
                 </div>
             </div>
         );
     }
+
+    // Mensajes de éxito según el tipo de pago
+    const successMessages = {
+        card:          { title: '¡Pago aprobado!',          body: 'Tu pago fue procesado exitosamente. El pedido está confirmado.' },
+        card_pending:  { title: '¡Pedido recibido!',         body: 'Tu pago está siendo procesado. Te notificaremos cuando se confirme.' },
+        bank_transfer: { title: '¡Pedido registrado!',       body: 'Una vez que confirmemos tu transferencia, actualizaremos el estado de tu pedido.' },
+        cash:          { title: '¡Pedido confirmado!',       body: 'Abonarás en efectivo al momento de la entrega.' },
+        whatsapp:      { title: '¡Pedido enviado!',          body: 'Tu pedido fue enviado a WhatsApp. Nos comunicaremos pronto para confirmarlo.' },
+    };
+    const successMsg = successMessages[orderPaymentType] || successMessages.whatsapp;
+
+    // Si el pedido fue colocado con éxito
+    if (orderPlaced) {
+        const cardBg = isDarkMode ? theme.background?.dark?.card || '#1e1e1e' : theme.background?.light?.card || '#ffffff';
+        const textPrimary = isDarkMode ? theme.text?.dark?.primary || '#ffffff' : theme.text?.light?.primary || '#252525';
+        const textSecondary = isDarkMode ? theme.text?.dark?.secondary || '#e0e0e0' : theme.text?.light?.secondary || '#3e3e3e';
+        const borderColor = isDarkMode ? theme.border?.dark?.main || '#3a3a3a' : theme.border?.light?.main || '#e0e0e0';
+        const primaryGradient = theme.primary?.gradient || 'linear-gradient(135deg, #9a334d 0%, #7a2639 100%)';
+
+        return (
+            <div className="min-h-screen flex flex-col transition-colors duration-300"
+                style={{ backgroundColor: isDarkMode ? theme.background?.dark?.main || '#121212' : theme.background?.light?.main || '#f8f5f0' }}>
+                <StoreHeader
+                    isDarkMode={isDarkMode}
+                    storeConfig={storeConfig}
+                    theme={theme}
+                    getTotalCartItems={() => 0}
+                    onLoginClick={handleLoginFromHeader}
+                />
+
+                <div className="flex-1 flex items-center justify-center p-4">
+                    <div className="max-w-md w-full text-center p-8 rounded-xl shadow-lg"
+                        style={{ backgroundColor: cardBg, border: `1px solid ${borderColor}` }}>
+
+                        {/* Ícono de éxito */}
+                        <div className="mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-6"
+                            style={{ background: primaryGradient }}>
+                            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                        </div>
+
+                        <h2 className="text-2xl font-bold mb-3" style={{ color: textPrimary }}>
+                            {successMsg.title}
+                        </h2>
+                        <p className="text-sm mb-2" style={{ color: textSecondary }}>
+                            {successMsg.body}
+                        </p>
+                        <p className="text-xs mb-8" style={{ color: textSecondary }}>
+                            Serás redirigido a tus pedidos en 5 segundos…
+                        </p>
+
+                        <div className="flex flex-col gap-3">
+                            <button
+                                onClick={() => router.push('/store/profile')}
+                                className="w-full px-6 py-3 rounded-lg text-white font-semibold transition-all hover:opacity-90"
+                                style={{ background: primaryGradient }}>
+                                Ver mis pedidos
+                            </button>
+                            <button
+                                onClick={() => router.push('/store')}
+                                className="w-full px-6 py-2 rounded-lg font-medium transition-all hover:opacity-70 border"
+                                style={{ color: textSecondary, borderColor }}>
+                                Seguir comprando
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
     
+    // Mientras se restaura el carrito desde localStorage mostrar spinner
+    if (!isCartLoaded) {
+        return (
+            <div className="min-h-screen flex items-center justify-center"
+                style={{ backgroundColor: isDarkMode ? theme.background?.dark?.main || '#121212' : theme.background?.light?.main || '#f8f5f0' }}>
+                <div className="w-8 h-8 border-t-2 border-r-2 rounded-full animate-spin"
+                    style={{ borderColor: isDarkMode ? theme.primary?.dark?.main || '#7a2639' : theme.primary?.light?.main || '#9a334d' }} />
+            </div>
+        );
+    }
+
     if (cart.length === 0) {
-       return(
-        <div>Carrito vacio</div>
-       )
+        return null;
     }
     
     // Mostrar loading mientras se cargan los datos del usuario
@@ -532,18 +755,63 @@ const CheckoutPage = () => {
             
             <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-                    {/* Formulario de datos del cliente - 3 columnas en desktop */}
+                    {/* Panel izquierdo: formulario O paso de pago */}
                     <div className="md:col-span-3">
                         <div className="p-6 rounded-lg shadow-md"
-                            style={{ 
-                                backgroundColor: isDarkMode 
-                                    ? theme.background?.dark?.card || '#1e1e1e' 
+                            style={{
+                                backgroundColor: isDarkMode
+                                    ? theme.background?.dark?.card || '#1e1e1e'
                                     : theme.background?.light?.card || '#ffffff',
-                                borderColor: isDarkMode 
-                                    ? theme.border?.dark?.main || '#3a3a3a' 
+                                borderColor: isDarkMode
+                                    ? theme.border?.dark?.main || '#3a3a3a'
                                     : theme.border?.light?.main || '#e0e0e0',
                                 border: '1px solid'
                             }}>
+
+                        {/* ── PASO DE PAGO ─────────────────────────────────── */}
+                        {paymentStep && !isViewOnly ? (
+                            <div>
+                                {/* Cabecera del paso */}
+                                <div className="flex items-center gap-3 mb-6">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentStep(false)}
+                                        className="p-2 rounded-lg transition-colors hover:opacity-70"
+                                        style={{
+                                            color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted,
+                                            backgroundColor: isDarkMode ? '#ffffff10' : '#00000008',
+                                        }}
+                                    >
+                                        <FaArrowLeft className="text-sm" />
+                                    </button>
+                                    <div>
+                                        <h2 className="text-xl font-bold"
+                                            style={{ color: isDarkMode ? theme.text?.dark?.primary : theme.text?.light?.primary }}>
+                                            Método de pago
+                                        </h2>
+                                        <p className="text-xs flex items-center gap-1 mt-0.5"
+                                            style={{ color: isDarkMode ? theme.text?.dark?.muted : theme.text?.light?.muted }}>
+                                            <FaLock className="text-emerald-500" /> Conexión segura
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <PaymentGateway
+                                    orderTotal={getTotalPrice()}
+                                    customerEmail={formData.email}
+                                    onCardPaymentSubmit={handleCardPayment}
+                                    onNonCardConfirm={handleNonCardConfirm}
+                                    onMpAccountPayment={handleMpAccountPayment}
+                                    isProcessing={isSubmitting}
+                                    isDarkMode={isDarkMode}
+                                    theme={theme}
+                                    getPaymentMethods={getStorePaymentMethods}
+                                    brickResetKey={mpBrickResetKey}
+                                />
+                            </div>
+                        ) : (
+                        /* ── FORMULARIO DE DATOS ──────────────────────────── */
+                        <div>
                             <h2 className="text-2xl font-bold mb-6"
                                 style={{ 
                                     color: isDarkMode 
@@ -903,41 +1171,43 @@ const CheckoutPage = () => {
                                     </div>
                                 </div>
                                 
+                                {isViewOnly && (
                                 <div className="mt-6 p-4 rounded-md"
-                                    style={{ 
-                                        backgroundColor: isDarkMode 
-                                            ? `${theme.background?.dark?.elevated || '#252525'}40` 
+                                    style={{
+                                        backgroundColor: isDarkMode
+                                            ? `${theme.background?.dark?.elevated || '#252525'}40`
                                             : `${theme.background?.light?.elevated || '#f5f0e8'}80`,
-                                        borderLeft: `4px solid ${isDarkMode 
-                                            ? theme.accent?.dark?.main || '#7a2639' 
+                                        borderLeft: `4px solid ${isDarkMode
+                                            ? theme.accent?.dark?.main || '#7a2639'
                                             : theme.accent?.light?.main || '#9a334d'}`,
                                     }}>
                                     <div className="flex items-center gap-2">
                                         <svg className="w-5 h-5" fill="currentColor" style={{
-                                            color: isDarkMode 
-                                                ? theme.accent?.dark?.main || '#7a2639' 
+                                            color: isDarkMode
+                                                ? theme.accent?.dark?.main || '#7a2639'
                                                 : theme.accent?.light?.main || '#9a334d'
                                         }} viewBox="0 0 24 24">
                                             <path d="M17.498 14.382c-.301-.15-1.767-.867-2.04-.966-.273-.101-.473-.15-.673.15-.197.295-.771.964-.944 1.162-.175.195-.349.21-.646.075-.3-.15-1.263-.465-2.403-1.485-.888-.795-1.484-1.77-1.66-2.07-.174-.3-.019-.465.13-.615.136-.135.301-.345.451-.523.146-.181.194-.301.297-.496.1-.21.049-.375-.025-.524-.075-.15-.672-1.62-.922-2.206-.24-.584-.487-.51-.672-.51-.172-.015-.371-.015-.571-.015-.2 0-.523.074-.798.359-.273.3-1.045 1.02-1.045 2.475s1.07 2.865 1.219 3.075c.149.195 2.105 3.195 5.1 4.485.714.3 1.27.48 1.704.629.714.227 1.365.195 1.88.121.574-.091 1.767-.721 2.016-1.426.255-.705.255-1.29.18-1.425-.074-.135-.27-.21-.57-.345m-5.446 7.443h-.016c-1.77 0-3.524-.48-5.055-1.38l-.36-.214-3.75.975 1.005-3.645-.239-.375c-.99-1.576-1.516-3.391-1.516-5.26 0-5.445 4.455-9.885 9.942-9.885 2.654 0 5.145 1.035 7.021 2.91 1.875 1.859 2.909 4.35 2.909 6.99-.004 5.444-4.46 9.885-9.935 9.885M20.52 3.449C18.24 1.245 15.24 0 12.045 0 5.463 0 .104 5.334.101 11.893c0 2.096.549 4.14 1.595 5.945L0 24l6.335-1.652c1.746.943 3.71 1.444 5.71 1.447h.006c6.585 0 11.946-5.336 11.949-11.896 0-3.176-1.24-6.165-3.495-8.411"/>
                                         </svg>
                                         <span className="font-medium"
-                                            style={{ 
-                                                color: isDarkMode 
-                                                    ? theme.accent?.dark?.main || '#7a2639' 
+                                            style={{
+                                                color: isDarkMode
+                                                    ? theme.accent?.dark?.main || '#7a2639'
                                                     : theme.accent?.light?.main || '#9a334d'
                                             }}>
                                             Pedido por WhatsApp
                                         </span>
                                     </div>
                                     <p className="mt-2 text-sm"
-                                        style={{ 
-                                            color: isDarkMode 
-                                                ? theme.text?.dark?.secondary || '#e0e0e0' 
+                                        style={{
+                                            color: isDarkMode
+                                                ? theme.text?.dark?.secondary || '#e0e0e0'
                                                 : theme.text?.light?.secondary || '#3e3e3e'
                                         }}>
                                         Al finalizar tu pedido, serás redirigido a WhatsApp para comunicarte directamente con el vendedor.
                                     </p>
                                 </div>
+                                )}
 
                                 {/* Mensaje para usuario autenticado */}
                                 {isUserAuthenticated && (
@@ -997,16 +1267,17 @@ const CheckoutPage = () => {
                                             </div>
                                         ) : 
                                         <div>
-                                            <span>Solicitar por WhatsApp</span>
-                                            <FaWhatsapp className="inline-block ml-2" />
-                                            
+                                            <span>{isViewOnly ? 'Confirmar pedido' : 'Continuar al pago'}</span>
+                                            {!isViewOnly && <FaLock className="inline-block ml-2 text-xs" />}
                                         </div>}
                                     </button>
                                 </div>
                             </form>
                         </div>
+                        )} {/* fin condicional paymentStep */}
+                        </div> {/* fin card container */}
                     </div>
-                    
+
                     {/* Resumen del pedido - 2 columnas en desktop */}
                     <div className="md:col-span-2">
                         <div className="sticky top-24 p-6 rounded-lg shadow-md"
@@ -1150,98 +1421,6 @@ const CheckoutPage = () => {
                 onClearCart={clearCart}
             />
         
-            {/* Modal de salida */}
-            {showExitModal && (
-                <div className="fixed inset-0 z-50 overflow-hidden transition-all duration-300 ease-in-out">
-                    {/* Overlay */}
-                    <div 
-                        className="fixed inset-0 backdrop-blur-md bg-black bg-opacity-60 transition-all duration-300"
-                        onClick={handleContinueShopping}
-                    ></div>
-                    
-                    {/* Modal */}
-                    <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md p-6 rounded-lg backdrop-blur-md shadow-xl transform transition-all duration-300 animate-fade-in "
-                        style={{
-                            backgroundColor: isDarkMode 
-                                ? theme?.background?.dark?.card || '#1e1e1e' 
-                                : theme?.background?.light?.card || '#ffffff',
-                            borderColor: isDarkMode 
-                                ? theme?.border?.dark?.main || '#3a3a3a' 
-                                : theme?.border?.light?.main || '#e0e0e0',
-                            border: '1px solid'
-                        }}
-                    >
-                        <div className="text-center mb-6">
-                            <div className="mx-auto w-16 h-16 rounded-full mb-4 flex items-center justify-center"
-                                style={{ 
-                                    backgroundColor: isDarkMode 
-                                        ? theme?.warning?.dark || '#ffc107' 
-                                        : theme?.warning?.light || '#ffc107',
-                                    opacity: 0.2
-                                }}
-                            >
-                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                    style={{ 
-                                        color: isDarkMode 
-                                            ? theme?.warning?.dark || '#131212ff' 
-                                            : theme?.warning?.light || '#000000ff'
-                                    }}
-                                >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                </svg>
-                            </div>
-                            <h3 className="text-lg font-bold mb-2"
-                                style={{ 
-                                    color: isDarkMode 
-                                        ? theme?.text?.dark?.primary || '#ffffff' 
-                                        : theme?.text?.light?.primary || '#252525'
-                                }}
-                            >
-                                ¿Deseas abandonar tu compra?
-                            </h3>
-                            <p className="mb-6"
-                                style={{ 
-                                    color: isDarkMode 
-                                        ? theme?.text?.dark?.secondary || '#e0e0e0' 
-                                        : theme?.text?.light?.secondary || '#3e3e3e'
-                                }}
-                            >
-                                Tu carrito permanecerá guardado durante 2 horas. Después de ese tiempo, los productos serán eliminados automáticamente.
-                            </p>
-                            
-                            <div className="flex space-x-3">
-                                <button
-                                    onClick={handleContinueShopping}
-                                    className="flex-1 py-2 px-4 rounded-lg font-medium transition-all border hover:opacity-80"
-                                    style={{ 
-                                        borderColor: isDarkMode 
-                                            ? theme?.border?.dark?.main || '#3a3a3a' 
-                                            : theme?.border?.light?.main || '#e0e0e0',
-                                        backgroundColor: isDarkMode 
-                                            ? theme?.background?.dark?.card || '#1e1e1e' 
-                                            : theme?.background?.light?.card || '#ffffff',
-                                        color: isDarkMode 
-                                            ? theme?.text?.dark?.primary || '#ffffff' 
-                                            : theme?.text?.light?.primary || '#252525'
-                                    }}
-                                >
-                                    Continuar Comprando
-                                </button>
-                                <button
-                                    onClick={handleExit}
-                                    className="flex-1 py-2 px-4 rounded-lg font-medium transition-all hover:opacity-80"
-                                    style={{ 
-                                        background: theme?.primary?.gradient ,
-                                        color: '#ffffff'
-                                    }}
-                                >
-                                    Salir
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Modal de creación de usuario */}
             {showUserCreateModal && (
@@ -1268,6 +1447,16 @@ const CheckoutPage = () => {
                 />
             )}
 
+            {/* Alert de errores de pago */}
+            {paymentAlert && (
+                <Alert
+                    type={paymentAlert.type}
+                    title={paymentAlert.title}
+                    message={paymentAlert.message}
+                    onClose={() => setPaymentAlert(null)}
+                    autoClose={false}
+                />
+            )}
 
         </div>
     );

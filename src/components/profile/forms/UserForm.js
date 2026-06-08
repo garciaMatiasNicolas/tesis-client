@@ -195,7 +195,7 @@ const UserForm = ({ user, onChange, onSave, loading = false, saving = false }) =
                     </div>
                     <button
                         type="button"
-                        className="absolute bottom-2 right-2 bg-[#18c29c] text-white rounded-full p-2 shadow hover:bg-[#13a884] transition"
+                        className="absolute bottom-2 right-2 bg-[#18c29c] text-white rounded-full p-2 shadow hover:bg-[#18c29c] transition"
                         onClick={() => fileInputRef.current.click()}
                         title="Cambiar foto"
                     >
@@ -490,7 +490,7 @@ const UserForm = ({ user, onChange, onSave, loading = false, saving = false }) =
             )}
             <button
                 type="button"
-                className={`mt-8 flex items-center gap-2 bg-[#18c29c] hover:bg-[#13a884] text-white px-6 py-2 rounded-md font-semibold text-lg transition ${
+                className={`mt-8 flex items-center gap-2 bg-[#18c29c] hover:bg-[#18c29c] text-white px-6 py-2 rounded-md font-semibold text-lg transition ${
                     saving ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
                 onClick={() => onSave(user)}

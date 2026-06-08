@@ -213,6 +213,9 @@ export default function SupplierModal({
         if (!newSupplier.country.trim()) {
             validationErrors.country = ['El país es obligatorio'];
         }
+        if (!newSupplier.lead_time_days) {
+            validationErrors.lead_time_days = ['El tiempo de entrega es obligatorio'];
+        }
 
         if (Object.keys(validationErrors).length > 0) {
             setErrors(validationErrors);
@@ -469,6 +472,7 @@ export default function SupplierModal({
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Tiempo de Entrega (días)
                                     <span className="text-gray-500 text-xs ml-1">- Lead Time</span>
+                                    <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     className="w-full border border-gray-300 rounded px-3 py-2 text-gray-900 focus:ring-2 focus:ring-[#18c29c] focus:border-transparent transition-all"

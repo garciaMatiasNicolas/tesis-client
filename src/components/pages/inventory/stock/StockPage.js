@@ -1,7 +1,7 @@
 "use client";
 import SideBar from '@/components/ui/SideBar';
 import Alert from '@/components/ui/Alert';
-import StockTable from '@/components/stock/StockTable';
+import StockTable from '@/components/modules/stock/StockTable';
 import React, { useState } from 'react';
 
 const StockPage = () => {

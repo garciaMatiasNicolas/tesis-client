@@ -1,8 +1,8 @@
 "use client";
 import React, { useState } from 'react';
 import { FaPlus, FaEdit, FaTrash, FaSpinner, FaSearch, FaFolder, FaTags } from 'react-icons/fa';
+import DeleteConfirmationModal from '@/components/ui/DeleteConfirmationModal';
 import CategoriesModal from './CategoriesModal';
-import DeleteConfirmationModal from '../ui/DeleteConfirmationModal';
 
 export default function CategoriesTable({
     categories = [],

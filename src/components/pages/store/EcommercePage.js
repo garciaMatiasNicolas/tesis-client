@@ -2,13 +2,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import useEcommerceService from '@/services/ecommerceService';
 import '../../../themes/modeTransitions.css';
-import StoreHeader from '@/components/store/StoreHeader';
+import StoreHeader from '@/components/modules/store/StoreHeader';
 import { useCart } from '@/hooks/useCart';
 import { useStoreWithTheme } from '@/hooks/useStore';
-import ProductFilters from '@/components/store/ProductFilters';
-import ProductSort from '@/components/store/ProductSort';
-import ProductGrid from '@/components/store/ProductGrid';
-import ShoppingCart from '@/components/store/ShoppingCart';
+import ProductFilters from '@/components/modules/store/ProductFilters';
+import ProductSort from '@/components/modules/store/ProductSort';
+import ProductGrid from '@/components/modules/store/ProductGrid';
+import ShoppingCart from '@/components/modules/store/ShoppingCart';
+import { useToast } from '@/components/ui/Toast';
 
 const EcommercePage = () => {
     // Hooks personalizados - Usa el hook combinado para obtener store + theme
@@ -21,9 +22,10 @@ const EcommercePage = () => {
         storeTheme 
     } = useStoreWithTheme();
     const { cart, addToCart, updateQuantity, removeFromCart, clearCart, getTotalPrice, getTotalCartItems } = useCart();
-    
+    const { success, warning } = useToast();
+
     // Estados principales
-    const { getAllProducts, getCategories, getSubcategories, getSuppliers } = useEcommerceService();
+    const { getAllProducts, getCategories, getSubcategories, getSuppliers, validateStockProduct } = useEcommerceService();
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [subcategories, setSubcategories] = useState([]);
@@ -205,6 +207,26 @@ const EcommercePage = () => {
         }
     }, [pageSize]);
     
+    const handleAddToCart = async (product) => {
+        const currentQty = cart.find(i => i.id === product.id)?.quantity ?? 0;
+        const requestedQty = currentQty + 1;
+        try {
+            const result = await validateStockProduct(product.id, requestedQty);
+            if (result.available) {
+                addToCart(product);
+                success('Agregado al carrito', product.description);
+            } else {
+                warning(
+                    'Stock insuficiente',
+                    `Solo hay ${result.available_stock} ${product.base_unit_name || 'unidades'} disponibles de "${product.description}".`
+                );
+            }
+        } catch {
+            addToCart(product);
+            success('Agregado al carrito', product.description);
+        }
+    };
+
     // Función para cargar más productos
     const loadMoreProducts = () => {
         const nextPage = currentPage + 1;
@@ -437,7 +459,7 @@ const EcommercePage = () => {
                     products={products}
                     loading={loading}
                     theme={theme}
-                    onAddToCart={addToCart}
+                    onAddToCart={handleAddToCart}
                     hasMore={currentPage < totalPages}
                     onLoadMore={loadMoreProducts}
                     totalProducts={totalProducts}

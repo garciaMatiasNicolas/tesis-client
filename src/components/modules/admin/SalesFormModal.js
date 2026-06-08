@@ -22,6 +22,7 @@ import {
 } from "react-icons/fa";
 import crmService from '@/services/crmService';
 import useProductService from '@/services/productService';
+import paymentMethodsService from '@/services/paymentMethodsService';
 import useApiMethods from "@/hooks/useApiMethods";
 import { formatPrice } from "@/utils/formatData";
 import Link from 'next/link';
@@ -110,6 +111,7 @@ export default function SalesFormModal({
 
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
+    const [paymentMethods, setPaymentMethods] = useState([]);
     const [loadingData, setLoadingData] = useState(false);
     const [dataLoaded, setDataLoaded] = useState(false);
     const [errors, setErrors] = useState({});
@@ -507,10 +509,17 @@ export default function SalesFormModal({
                 
                 // Inicializar servicios
                 crmService.initialize(apiMethods);
-                
-                // Cargar clientes
-                const customersResponse = await crmService.getCustomers();
+                paymentMethodsService.initialize(apiMethods);
+
+                // Cargar clientes y métodos de pago en paralelo
+                const [customersResponse, paymentMethodsResponse] = await Promise.all([
+                    crmService.getCustomers(),
+                    paymentMethodsService.getPaymentMethods({ is_active: true })
+                ]);
                 setCustomers(customersResponse.results || customersResponse || []);
+                setPaymentMethods(
+                    (paymentMethodsResponse.results || paymentMethodsResponse || []).filter(m => m.is_active !== false)
+                );
                 
                 // Cargar productos usando el servicio
                 const productsResponse = await productService.getAllProducts({all: true});
@@ -615,7 +624,7 @@ export default function SalesFormModal({
                 setFormData({
                     customer_id: salesOrder.customer?.id || '',
                     sales_channel: salesOrder.sales_channel || 'ecommerce',
-                    payment_method: salesOrder.payment_method || '',
+                    payment_method: salesOrder.payment_method?.id?.toString() || '',
                     delivery_date: salesOrder.delivery_date || '',
                     deliver_to: salesOrder.deliver_to || '',
                     shipping_cost: salesOrder.shipping_cost?.toString() || '0',
@@ -1281,15 +1290,11 @@ export default function SalesFormModal({
         { value: 'wholesale', label: 'Mayorista', icon: FaFileInvoiceDollar }
     ];
 
-    const paymentMethods = [
-        'Efectivo',
-        'Tarjeta de Crédito',
-        'Tarjeta de Débito',
-        'Transferencia Bancaria',
-        'Cheque',
-        'Mercado Pago',
-        'Otro'
-    ];
+    const providerLabels = {
+        cash: 'Efectivo',
+        bank_transfer: 'Transferencia',
+        mercadopago: 'Mercado Pago',
+    };
 
     return (
         <>
@@ -1690,8 +1695,11 @@ export default function SalesFormModal({
                                     >
                                         <option value="">Seleccionar método</option>
                                         {paymentMethods.map(method => (
-                                            <option key={method} value={method}>
-                                                {method}
+                                            <option key={method.id} value={method.id}>
+                                                {method.name}
+                                                {method.provider && providerLabels[method.provider]
+                                                    ? ` (${providerLabels[method.provider]})`
+                                                    : ''}
                                             </option>
                                         ))}
                                     </select>

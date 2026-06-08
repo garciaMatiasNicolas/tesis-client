@@ -237,7 +237,7 @@ const BranchesForm = ({
                     {canAdd && (
                         <button
                             type="button"
-                            className="bg-[#18c29c] hover:bg-[#13a884] text-white px-6 py-3 rounded-lg font-semibold transition"
+                            className="bg-[#18c29c] hover:bg-[#18c29c] text-white px-6 py-3 rounded-lg font-semibold transition"
                             onClick={onAdd}
                         >
                             <FaPlus className="inline mr-2" />
@@ -651,7 +651,7 @@ const BranchesForm = ({
                                 <div className="mt-6 flex justify-end">
                                     <button
                                         type="button"
-                                        className={`bg-[#18c29c] hover:bg-[#13a884] text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                        className={`bg-[#18c29c] hover:bg-[#18c29c] text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
                                             loading ? 'opacity-50 cursor-not-allowed' : ''
                                         }`}
                                         onClick={() => confirmChanges(branch)}
@@ -680,7 +680,7 @@ const BranchesForm = ({
                 <div className="mt-6">
                     <button
                         type="button"
-                        className={`bg-[#18c29c] hover:bg-[#13a884] text-white px-6 py-3 rounded-lg font-semibold transition ${
+                        className={`bg-[#18c29c] hover:bg-[#18c29c] text-white px-6 py-3 rounded-lg font-semibold transition ${
                             loading ? 'opacity-50 cursor-not-allowed' : ''
                         }`}
                         onClick={onAdd}

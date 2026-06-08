@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import SideBar from "@/components/ui/SideBar";
 import Alert from "@/components/ui/Alert";
-import ProductUnitsTable from "@/components/products/ProductUnitsTable";
+import ProductUnitsTable from "@/components/modules/products/ProductUnitsTable";
 import { FaBox, FaInfoCircle } from "react-icons/fa";
 
 export default function ProductUnitsPage() {

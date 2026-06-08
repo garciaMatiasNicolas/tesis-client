@@ -1,10 +1,10 @@
 "use client";
 import { useState, useEffect } from 'react';
 import SideBar from '@/components/ui/SideBar';
-import StatCard from '@/components/admin/StatCard';
-import SalesChart from '@/components/admin/SalesChart';
-import TopProductsTable from '@/components/admin/TopProductsTable';
-import StockAlertsTable from '@/components/admin/StockAlertsTable';
+import StatCard from '@/components/modules/admin/StatCard';
+import SalesChart from '@/components/modules/admin/SalesChart';
+import TopProductsTable from '@/components/modules/admin/TopProductsTable';
+import StockAlertsTable from '@/components/modules/admin/StockAlertsTable';
 import useApiMethods from '@/hooks/useApiMethods';
 import statsService from '@/services/statsService';
 

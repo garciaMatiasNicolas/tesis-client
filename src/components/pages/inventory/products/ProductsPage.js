@@ -4,7 +4,7 @@ import SideBar from "@/components/ui/SideBar";
 import Alert from "@/components/ui/Alert";
 import Link from "next/link";
 import useProductService from "@/services/productService";
-import ProductsTable from "@/components/products/ProductsTable";
+import ProductsTable from "@/components/modules/products/ProductsTable";
 import { FaPlus } from "react-icons/fa";
 
 export default function ProductsPage() {

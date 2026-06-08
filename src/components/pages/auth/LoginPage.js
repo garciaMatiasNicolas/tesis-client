@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
-import AuthForm from "@/components/auth/AuthForm";
-import Enable2FA from "@/components/auth/Enable2FA";
+import AuthForm from "@/components/modules/auth/AuthForm";
+import Enable2FA from "@/components/modules/auth/Enable2FA";
 import useApiMethods from "@/hooks/useApiMethods";
 import Alert from "@/components/ui/Alert";
 import { setAuthTokenIntoCookie } from "@/services/auth";
@@ -127,15 +127,7 @@ const LoginPage = () => {
     };
 
     return (
-        <div
-            style={{
-                backgroundImage: "url('/assets/bg.jpg')",
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                backgroundRepeat: "no-repeat",
-            }}
-            className="relative min-h-screen flex items-center justify-center overflow-hidden"
-        >
+        <div className="relative min-h-screen flex items-center justify-center bg-gradient-to-br from-[#223263] to-[#18c29c] overflow-hidden">
             {showAlert && (
                 <Alert
                     title={alertTitle}
@@ -145,7 +137,9 @@ const LoginPage = () => {
                 />
             )}
 
-            <div className="absolute inset-0 w-full h-full bg-black" style={{ opacity: 0.4 }}></div>
+            {/* Decorative circles */}
+            <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-white opacity-5" />
+            <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full bg-white opacity-5" />
             <div className="z-10 flex items-center justify-center w-full min-h-screen">
                 {showEnable2FA && qrData ? (
                     <Enable2FA qrData={qrData} email={email} />

@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
-import PurchaseOrdersTable from '@/components/admin/PurchaseOrdersTable';
-import PurchaseFormModal from '@/components/admin/PurchaseFormModal';
+import PurchaseOrdersTable from '@/components/modules/admin/PurchaseOrdersTable';
+import PurchaseFormModal from '@/components/modules/admin/PurchaseFormModal';
 import SideBar from '@/components/ui/SideBar';
 import Alert from '@/components/ui/Alert';
 import useApiMethods from '@/hooks/useApiMethods';

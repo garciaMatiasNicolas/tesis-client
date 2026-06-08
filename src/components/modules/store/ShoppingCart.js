@@ -1,11 +1,32 @@
+"use client";
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/hooks/useTheme';
+import { useToast } from '@/components/ui/Toast';
+import useEcommerceService from '@/services/ecommerceService';
 
 const ShoppingCart = ({ isOpen, onClose, cartItems = [], onUpdateQuantity, onRemoveItem, onClearCart, isCheckoutPage = false }) => {
     const router = useRouter();
     const { isDarkMode, theme } = useTheme();
+    const { warning } = useToast();
+    const { validateStockProduct } = useEcommerceService();
     const [isProcessing, setIsProcessing] = useState(false);
+
+    const handleIncreaseQuantity = async (item) => {
+        try {
+            const result = await validateStockProduct(item.id, item.quantity + 1);
+            if (result.available) {
+                onUpdateQuantity(item.id, item.quantity + 1);
+            } else {
+                warning(
+                    'Stock insuficiente',
+                    `Solo hay ${result.available_stock} ${item.base_unit_name || 'unidades'} disponibles de "${item.description || item.name}".`
+                );
+            }
+        } catch {
+            onUpdateQuantity(item.id, item.quantity + 1);
+        }
+    };
 
     const getTotalPrice = () => {
         return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2);
@@ -239,14 +260,14 @@ const ShoppingCart = ({ isOpen, onClose, cartItems = [], onUpdateQuantity, onRem
                             </span>
                             <button
                                 disabled={isProcessing || isCheckoutPage}
-                                onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                                onClick={() => handleIncreaseQuantity(item)}
                                 className="w-8 h-8 rounded-full flex items-center justify-center transition-colors cursor-pointer hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
                                 style={{
-                                    backgroundColor: isDarkMode 
-                                        ? theme?.background?.dark?.card || '#1e1e1e' 
+                                    backgroundColor: isDarkMode
+                                        ? theme?.background?.dark?.card || '#1e1e1e'
                                         : theme?.background?.light?.card || '#ffffff',
-                                    color: isDarkMode 
-                                        ? theme?.text?.dark?.primary || '#ffffff' 
+                                    color: isDarkMode
+                                        ? theme?.text?.dark?.primary || '#ffffff'
                                         : theme?.text?.light?.primary || '#252525'
                                 }}
                             >
@@ -258,7 +279,10 @@ const ShoppingCart = ({ isOpen, onClose, cartItems = [], onUpdateQuantity, onRem
 
                         {/* Botón eliminar */}
                         <button
-                            onClick={() => onRemoveItem(item.id)}
+                            onClick={() => {
+                                onRemoveItem(item.id);
+                                warning('Producto eliminado', item.name || item.description);
+                            }}
                             disabled={isProcessing || isCheckoutPage}
                             className="transition-colors cursor-pointer hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
                             style={{
@@ -330,7 +354,10 @@ const ShoppingCart = ({ isOpen, onClose, cartItems = [], onUpdateQuantity, onRem
                         </button>
                         
                         <button
-                            onClick={onClearCart}
+                            onClick={() => {
+                                onClearCart();
+                                warning('Carrito vaciado', 'Se eliminaron todos los productos');
+                            }}
                             disabled={isProcessing || isCheckoutPage}
                             className="w-full py-2 px-4 border rounded-lg transition-all duration-300 cursor-pointer hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
                             style={{ 

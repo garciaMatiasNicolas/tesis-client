@@ -4,17 +4,20 @@ import { useRouter, useParams } from 'next/navigation';
 import useEcommerceService from '@/services/ecommerceService';
 import { useCart } from '@/hooks/useCart';
 import { useStoreWithTheme } from '@/hooks/useStore';
-import StoreHeader from '@/components/store/StoreHeader';
+import StoreHeader from '@/components/modules/store/StoreHeader';
+import ShoppingCart from '@/components/modules/store/ShoppingCart';
 import { formatPrice } from '@/utils/formatData';
 import Link from 'next/link';
+import { useToast } from '@/components/ui/Toast';
 
 export default function ProductDetailPage() {
     const router = useRouter();
     const params = useParams();
     const productId = params.id;
 
-    const { getProductById } = useEcommerceService();
-    const { addToCart, getTotalCartItems } = useCart();
+    const { getProductById, validateStockProduct } = useEcommerceService();
+    const { addToCart, cart, updateQuantity, removeFromCart, clearCart, getTotalCartItems } = useCart();
+    const { success, warning } = useToast();
     const { 
         isDarkMode, 
         theme, 
@@ -23,6 +26,7 @@ export default function ProductDetailPage() {
         loading: storeLoading 
     } = useStoreWithTheme();
 
+    const [isCartOpen, setIsCartOpen] = useState(false);
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [quantity, setQuantity] = useState(1);
@@ -204,13 +208,30 @@ export default function ProductDetailPage() {
         return urlString;
     };
 
-    const handleAddToCart = () => {
-        if (product && product.stock !== false) {
-            for (let i = 0; i < quantity; i++) {
-                addToCart(product);
+    const handleAddToCart = async () => {
+        if (!product || product.stock === false) return;
+        const currentQty = cart.find(i => i.id === product.id)?.quantity ?? 0;
+        const requestedQty = currentQty + quantity;
+        try {
+            const result = await validateStockProduct(product.id, requestedQty);
+            if (result.available) {
+                for (let i = 0; i < quantity; i++) addToCart(product);
+                success(
+                    'Agregado al carrito',
+                    `${quantity} ${quantity === 1 ? 'unidad' : 'unidades'} de ${product.description}`
+                );
+            } else {
+                warning(
+                    'Stock insuficiente',
+                    `Solo hay ${result.available_stock} ${product.base_unit_name || 'unidades'} disponibles de "${product.description}".`
+                );
             }
-            // Mostrar feedback visual (opcional)
-            alert(`${quantity} ${quantity === 1 ? 'unidad agregada' : 'unidades agregadas'} al carrito`);
+        } catch {
+            for (let i = 0; i < quantity; i++) addToCart(product);
+            success(
+                'Agregado al carrito',
+                `${quantity} ${quantity === 1 ? 'unidad' : 'unidades'} de ${product.description}`
+            );
         }
     };
 
@@ -227,10 +248,11 @@ export default function ProductDetailPage() {
                     backgroundColor: isDarkMode ? theme?.background?.dark?.main : theme?.background?.light?.main
                 }}
             >
-                <StoreHeader 
-                    isDarkMode={isDarkMode} 
-                    theme={theme} 
+                <StoreHeader
+                    isDarkMode={isDarkMode}
+                    theme={theme}
                     storeConfig={storeConfig}
+                    setIsCartOpen={setIsCartOpen}
                     getTotalCartItems={getTotalCartItems}
                 />
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -258,10 +280,11 @@ export default function ProductDetailPage() {
                     backgroundColor: isDarkMode ? theme.background.dark.main : theme.background.light.main
                 }}
             >
-                <StoreHeader 
-                    isDarkMode={isDarkMode} 
-                    theme={theme} 
+                <StoreHeader
+                    isDarkMode={isDarkMode}
+                    theme={theme}
                     storeConfig={storeConfig}
+                    setIsCartOpen={setIsCartOpen}
                     getTotalCartItems={getTotalCartItems}
                 />
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
@@ -293,10 +316,11 @@ export default function ProductDetailPage() {
                 backgroundColor: isDarkMode ? theme.background.dark.main : theme.background.light.main
             }}
         >
-            <StoreHeader 
-                isDarkMode={isDarkMode} 
-                theme={theme} 
+            <StoreHeader
+                isDarkMode={isDarkMode}
+                theme={theme}
                 storeConfig={storeConfig}
+                setIsCartOpen={setIsCartOpen}
                 getTotalCartItems={getTotalCartItems}
             />
 
@@ -609,6 +633,15 @@ export default function ProductDetailPage() {
                     </Link>
                 </div>
             </div>
+
+            <ShoppingCart
+                isOpen={isCartOpen}
+                onClose={() => setIsCartOpen(false)}
+                cartItems={cart}
+                onUpdateQuantity={updateQuantity}
+                onRemoveItem={removeFromCart}
+                onClearCart={clearCart}
+            />
 
             {/* Lightbox Modal para ver imagen ampliada */}
             {showLightbox && hasValidImage && (
